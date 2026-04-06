@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Supply Intelligence — Pangeia 96</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;700&display=swap');
 
@@ -546,6 +547,68 @@
 
   .btn:hover { opacity: 0.85; }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* LIVE COUNT CARDS */
+  .live-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid;
+    min-width: 80px;
+    text-align: center;
+  }
+  .live-card-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+    white-space: nowrap;
+  }
+  .live-card-val {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 22px;
+    line-height: 1;
+  }
+  .live-card-total  { background:#f0f2f5; border-color:#dde1e8; }
+  .live-card-total  .live-card-label { color:#6b7280; }
+  .live-card-total  .live-card-val   { color:#1a1d23; }
+  .live-card-ruptura { background:#fff0f0; border-color:#ffc5c5; }
+  .live-card-ruptura .live-card-label { color:#cc2222; }
+  .live-card-ruptura .live-card-val   { color:#cc2222; }
+  .live-card-pct    { background:#fdf0ff; border-color:#e4b5f8; }
+  .live-card-pct    .live-card-label { color:#8b26cc; }
+  .live-card-pct    .live-card-val   { color:#8b26cc; font-size:20px; }
+  .live-card-critico { background:#fef9ec; border-color:#f5e19a; }
+  .live-card-critico .live-card-label { color:#b87d00; }
+  .live-card-critico .live-card-val   { color:#b87d00; }
+  .live-card-gap     { background:#f0f5ff; border-color:#c5d5f5; }
+  .live-card-gap     .live-card-label { color:#3a5fc8; }
+  .live-card-gap     .live-card-val   { color:#3a5fc8; font-size:16px; }
+
+  .btn-export {
+    display: flex;
+    align-items: center;
+    background: #17803d;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    padding: 7px 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+  }
+
+  .btn-export:hover { background: #146b34; }
+  .btn-export:active { background: #0f5228; }
 </style>
 </head>
 <body>
@@ -613,7 +676,32 @@
       <select class="filter-select" id="filterTecido" onchange="filterRupturaTable()">
         <option value="">Todos os tecidos</option>
       </select>
-      <span id="rupturaCount" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);margin-left:auto;"></span>
+      <div id="liveCountCards" style="display:flex;gap:10px;margin-left:auto;align-items:center;">
+        <div class="live-card live-card-total">
+          <div class="live-card-label">ITENS EXIBIDOS</div>
+          <div class="live-card-val" id="countTotal">—</div>
+        </div>
+        <div class="live-card live-card-ruptura">
+          <div class="live-card-label">PEÇAS EM RUPTURA</div>
+          <div class="live-card-val" id="countRuptura">—</div>
+        </div>
+        <div class="live-card live-card-pct">
+          <div class="live-card-label">% RUPTURA</div>
+          <div class="live-card-val" id="countPct">—</div>
+        </div>
+        <div class="live-card live-card-critico">
+          <div class="live-card-label">CRÍTICO</div>
+          <div class="live-card-val" id="countCritico">—</div>
+        </div>
+        <div class="live-card live-card-gap">
+          <div class="live-card-label">GAP TOTAL</div>
+          <div class="live-card-val" id="countGap">—</div>
+        </div>
+      </div>
+      <button class="btn-export" onclick="exportRupturaXLSX()" title="Exportar tabela filtrada para Excel">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:middle;margin-right:5px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Exportar XLSX
+      </button>
     </div>
     <div class="panel">
       <div class="panel-header">
@@ -675,17 +763,17 @@
     <div class="grid-2" style="margin-bottom:16px;">
       <div class="panel">
         <div class="panel-header">
-          <span class="panel-title">Ruptura por Tecido</span>
+          <span class="panel-title">Peças Necessárias para Atender Demanda — por Tecido</span>
         </div>
-        <div class="panel-body" style="height:280px;">
+        <div class="panel-body" style="height:300px;">
           <canvas id="chartTecido"></canvas>
         </div>
       </div>
       <div class="panel">
         <div class="panel-header">
-          <span class="panel-title">Demanda por Tecido</span>
+          <span class="panel-title">Distribuição de Demanda Total por Tecido</span>
         </div>
-        <div class="panel-body" style="height:280px;">
+        <div class="panel-body" style="height:300px;">
           <canvas id="chartDemanda"></canvas>
         </div>
       </div>
@@ -693,8 +781,26 @@
     <div class="panel">
       <div class="panel-header">
         <span class="panel-title">Análise Completa por Tipo de Tecido</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6b7280;">peças necessárias = gap de ruptura + demanda total do tecido</span>
       </div>
-      <div class="panel-body" id="fabricDetail"></div>
+      <div class="panel-body" style="padding:0;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="background:#eef0f4;">
+              <th style="padding:10px 16px;text-align:left;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#6b7280;border-bottom:1px solid #dde1e8;">Tecido</th>
+              <th style="padding:10px 12px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#6b7280;border-bottom:1px solid #dde1e8;">SKUs</th>
+              <th style="padding:10px 12px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#cc2222;border-bottom:1px solid #dde1e8;">Em Ruptura</th>
+              <th style="padding:10px 12px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#cc2222;border-bottom:1px solid #dde1e8;">% Ruptura</th>
+              <th style="padding:10px 12px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#b87d00;border-bottom:1px solid #dde1e8;">Demanda Total (pç)</th>
+              <th style="padding:10px 12px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#cc2222;border-bottom:1px solid #dde1e8;">Gap Ruptura (pç)</th>
+              <th style="padding:10px 12px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#8b26cc;border-bottom:1px solid #dde1e8;">% Gap / Demanda</th>
+              <th style="padding:10px 12px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#3a5fc8;border-bottom:1px solid #dde1e8;">Custo Médio Tecido</th>
+              <th style="padding:10px 12px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:#3a5fc8;border-bottom:1px solid #dde1e8;">Custo Total Gap (R$)</th>
+            </tr>
+          </thead>
+          <tbody id="fabricTableBody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -922,7 +1028,20 @@ function applySortAndFilter() {
     </tr>`;
   });
 
-  document.getElementById('rupturaCount').textContent = `${rows.length} itens exibidos`;
+  document.getElementById('countTotal').textContent = rows.length.toLocaleString('pt-BR');
+  const totalPecasRuptura = rows.filter(r => r.ruptura).reduce((s,r) => s + (r.gap||0), 0);
+  const totalPecasDemanda = rows.reduce((s,r) => s + (r.demanda||0), 0);
+  const pctRuptura = totalPecasDemanda > 0 ? Math.round(totalPecasRuptura / totalPecasDemanda * 100) : 0;
+  const criticoRows = rows.filter(r => r.estoque_fisico < 0).length;
+  const gapTotal    = rows.reduce((s,r) => s + (r.gap||0), 0);
+  document.getElementById('countRuptura').textContent = totalPecasRuptura >= 1000
+    ? (totalPecasRuptura/1000).toFixed(1).replace('.',',') + 'k'
+    : Math.round(totalPecasRuptura).toLocaleString('pt-BR');
+  document.getElementById('countPct').textContent = pctRuptura + '%';
+  document.getElementById('countCritico').textContent = criticoRows.toLocaleString('pt-BR');
+  document.getElementById('countGap').textContent = gapTotal >= 1000
+    ? (gapTotal/1000).toFixed(1).replace('.',',') + 'k'
+    : gapTotal.toLocaleString('pt-BR');
 }
 
 function sortTable(table, col) {
@@ -980,6 +1099,7 @@ function renderPriorityTable() {
 function renderFabricCharts() {
   const fab = DATA.fabric.filter(f => f.tipo !== 'N/A').slice(0, 10);
 
+  // Chart 1: Grouped bar — Demanda total vs Gap de ruptura (peças)
   if (charts.tecido) charts.tecido.destroy();
   const ctx1 = document.getElementById('chartTecido').getContext('2d');
   charts.tecido = new Chart(ctx1, {
@@ -987,24 +1107,25 @@ function renderFabricCharts() {
     data: {
       labels: fab.map(f => f.tipo),
       datasets: [{
-        label: 'Total SKUs',
-        data: fab.map(f => f.total_skus),
-        backgroundColor: fab.map(f => (FABRIC_COLORS[f.tipo]||'#6b7280')+'60'),
+        label: 'Demanda Total (peças)',
+        data: fab.map(f => f.demanda),
+        backgroundColor: fab.map(f => (FABRIC_COLORS[f.tipo]||'#6b7280')+'55'),
         borderColor: fab.map(f => FABRIC_COLORS[f.tipo]||'#6b7280'),
         borderWidth: 1.5,
         borderRadius: 3,
       },{
-        label: 'Em Ruptura',
-        data: fab.map(f => f.ruptura),
-        backgroundColor: '#ff454560',
-        borderColor: '#ff4545',
+        label: 'Gap Ruptura (peças a entrar)',
+        data: fab.map(f => f.gap),
+        backgroundColor: '#cc222255',
+        borderColor: '#cc2222',
         borderWidth: 1.5,
         borderRadius: 3,
       }]
     },
-    options: chartOpts('SKUs')
+    options: chartOpts('Peças')
   });
 
+  // Chart 2: Doughnut — demanda por tecido
   if (charts.demanda) charts.demanda.destroy();
   const ctx2 = document.getElementById('chartDemanda').getContext('2d');
   charts.demanda = new Chart(ctx2, {
@@ -1020,43 +1141,70 @@ function renderFabricCharts() {
     },
     options: {
       plugins: {
-        legend: { labels: { color:'#6b7280', font:{family:"'IBM Plex Mono'",size:9}, padding:10 } }
+        legend: { labels: { color:'#6b7280', font:{family:"'IBM Plex Mono'",size:9}, padding:10 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const total = ctx.dataset.data.reduce((a,b)=>a+b,0);
+              const pct = Math.round(ctx.parsed/total*100);
+              return ` ${ctx.label}: ${ctx.parsed.toLocaleString('pt-BR')} pç (${pct}%)`;
+            }
+          }
+        }
       },
       responsive: true, maintainAspectRatio: false,
     }
   });
 
-  // Fabric detail rows
-  const det = document.getElementById('fabricDetail');
-  det.innerHTML = '';
-  DATA.fabric.forEach(f => {
+  // Table: fabric detail with demand + gap quantities
+  const totalDemanda = DATA.fabric.reduce((s,f)=>s+f.demanda,0);
+  const tbody = document.getElementById('fabricTableBody');
+  tbody.innerHTML = '';
+  DATA.fabric.forEach((f, i) => {
     const fc = FABRIC_COLORS[f.tipo] || '#6b7280';
-    const pct = f.total_skus > 0 ? Math.round(f.ruptura/f.total_skus*100) : 0;
-    det.innerHTML += `<div class="fabric-row">
-      <div>
-        <div class="fabric-name" style="color:${fc}">${f.tipo}</div>
-        <div class="fabric-mini">${f.total_skus} SKUs · Custo médio tecido: ${f.custo_medio>0?'R$ '+f.custo_medio.toFixed(2):'N/D'}</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-box-val" style="color:var(--red)">${f.ruptura}</div>
-        <div class="stat-box-label">Ruptura</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-box-val" style="color:var(--yellow)">${pct}%</div>
-        <div class="stat-box-label">% Ruptura</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-box-val" style="color:var(--accent)">${f.demanda.toLocaleString('pt-BR')}</div>
-        <div class="stat-box-label">Demanda</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-box-val" style="color:var(--text)">${f.gap.toLocaleString('pt-BR')}</div>
-        <div class="stat-box-label">Gap Total</div>
-      </div>
-    </div>`;
+    const pctRuptura = f.total_skus > 0 ? Math.round(f.ruptura/f.total_skus*100) : 0;
+    const pctGapDemanda = f.demanda > 0 ? Math.round(f.gap/f.demanda*100) : 0;
+    const custoTotalGap = f.custo_medio > 0 ? Math.round(f.gap * f.custo_medio) : null;
+    const alt = i % 2 === 1 ? 'background:#f8f9fc;' : '';
+
+    // % gap bar width
+    const barW = Math.min(pctGapDemanda, 100);
+    const barColor = pctGapDemanda >= 60 ? '#cc2222' : pctGapDemanda >= 30 ? '#b87d00' : '#17803d';
+
+    tbody.innerHTML += `<tr style="${alt}">
+      <td style="padding:11px 16px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:10px;height:10px;border-radius:2px;background:${fc};flex-shrink:0;"></div>
+          <div>
+            <div style="font-weight:600;font-size:12px;color:${fc};">${f.tipo}</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6b7280;margin-top:2px;">custo médio: ${f.custo_medio>0?'R$ '+f.custo_medio.toFixed(2):'N/D'}</div>
+          </div>
+        </div>
+      </td>
+      <td style="padding:11px 12px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#1a1d23;">${f.total_skus}</td>
+      <td style="padding:11px 12px;text-align:center;">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:#cc2222;">${f.ruptura}</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#6b7280;"> SKUs</span>
+      </td>
+      <td style="padding:11px 12px;text-align:center;">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:${pctRuptura>=50?'#cc2222':pctRuptura>=25?'#b87d00':'#17803d'};">${pctRuptura}%</span>
+      </td>
+      <td style="padding:11px 12px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#b87d00;font-weight:600;">${f.demanda.toLocaleString('pt-BR')}</td>
+      <td style="padding:11px 12px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#cc2222;font-weight:700;">${f.gap.toLocaleString('pt-BR')}</td>
+      <td style="padding:11px 12px;text-align:center;">
+        <div style="display:flex;align-items:center;gap:6px;justify-content:center;">
+          <div style="width:60px;height:6px;background:#eee;border-radius:3px;overflow:hidden;">
+            <div style="height:100%;width:${barW}%;background:${barColor};border-radius:3px;"></div>
+          </div>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:${barColor};">${pctGapDemanda}%</span>
+        </div>
+      </td>
+      <td style="padding:11px 12px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#3a5fc8;">${f.custo_medio>0?'R$ '+f.custo_medio.toFixed(2):'—'}</td>
+      <td style="padding:11px 12px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:#3a5fc8;">${custoTotalGap!=null?'R$ '+custoTotalGap.toLocaleString('pt-BR'):'—'}</td>
+    </tr>`;
   });
 
-  // Top 10 chart
+  // Top 10 urgência chart (insights tab)
   const top10 = DATA.items.filter(r=>r.ruptura&&r.demanda>0).sort((a,b)=>b.demanda-a.demanda).slice(0,10);
   if (charts.top10) charts.top10.destroy();
   const ctx3 = document.getElementById('chartTop10').getContext('2d');
@@ -1412,6 +1560,173 @@ function rebuildData(estoqueItems, pedidosMap) {
 // ═══════════════════════════════════════════
 function fmt(n) {
   return Math.round(n).toLocaleString('pt-BR');
+}
+
+// ═══════════════════════════════════════════
+// EXPORT RUPTURA → XLSX
+// ═══════════════════════════════════════════
+function exportRupturaXLSX() {
+  // Get current filtered + sorted rows from the live table
+  const search = document.getElementById('searchRuptura').value.toLowerCase();
+  const statusF = document.getElementById('filterStatus').value;
+  const tecidoF = document.getElementById('filterTecido').value;
+
+  let rows = DATA.items.filter(r => {
+    if (search && !r.sku.toLowerCase().includes(search) && !r.produto.toLowerCase().includes(search)) return false;
+    if (statusF === 'ruptura' && !r.ruptura) return false;
+    if (statusF === 'critico' && (r.ruptura || r.estoque_disponivel > 50)) return false;
+    if (statusF === 'ok' && (r.ruptura || r.estoque_disponivel <= 50)) return false;
+    if (tecidoF && r.tipo_tecido !== tecidoF) return false;
+    return true;
+  });
+
+  rows.sort((a, b) => {
+    let av = a[sortState.col], bv = b[sortState.col];
+    if (typeof av === 'string') av = av.toLowerCase();
+    if (typeof bv === 'string') bv = bv.toLowerCase();
+    if (av < bv) return sortState.dir === 'asc' ? -1 : 1;
+    if (av > bv) return sortState.dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const getStatus = r => r.estoque_fisico < 0 ? 'CRÍTICO' : r.ruptura ? 'RUPTURA' : r.estoque_disponivel < 50 ? 'CRÍTICO' : 'OK';
+
+  // Build worksheet data
+  const wsData = [
+    ['PANGEIA 96 — Ruptura Geral de Estoque'],
+    [`Gerado em: ${DATA.generated || new Date().toLocaleString('pt-BR')}   |   Filtros: Status=${statusF||'Todos'} | Tecido=${tecidoF||'Todos'} | Busca="${search||'—'}"   |   Total de itens: ${rows.length}`],
+    [],
+    ['SKU', 'Produto', 'Tipo de Tecido', 'Custo Tecido/pc (R$)', 'Estoque Físico', 'Estoque Reservado', 'Estoque Disponível', 'Demanda (Pedidos)', 'Gap de Entrada', 'Status'],
+    ...rows.map(r => [
+      r.sku,
+      r.produto,
+      r.tipo_tecido || 'N/A',
+      r.custo_tecido != null ? r.custo_tecido : '',
+      r.estoque_fisico,
+      r.estoque_reservado,
+      r.estoque_disponivel,
+      r.demanda,
+      r.gap,
+      getStatus(r)
+    ])
+  ];
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  // Column widths
+  ws['!cols'] = [
+    {wch:16},{wch:38},{wch:16},{wch:20},{wch:16},{wch:18},{wch:18},{wch:18},{wch:14},{wch:10}
+  ];
+
+  // Merge title cells A1:J1
+  ws['!merges'] = [
+    {s:{r:0,c:0}, e:{r:0,c:9}},
+    {s:{r:1,c:0}, e:{r:1,c:9}},
+  ];
+
+  // Style helpers
+  const titleStyle = { font:{bold:true,sz:14,color:{rgb:'1A1D23'}}, alignment:{horizontal:'left'}, fill:{fgColor:{rgb:'F5C842'}} };
+  const subStyle   = { font:{sz:9,color:{rgb:'6B7280'}}, alignment:{horizontal:'left'}, fill:{fgColor:{rgb:'F0F2F5'}} };
+  const headerStyle= { font:{bold:true,sz:9,color:{rgb:'FFFFFF'}}, alignment:{horizontal:'center'}, fill:{fgColor:{rgb:'1A1D23'}}, border:{bottom:{style:'thin',color:{rgb:'F5C842'}}} };
+  const numStyle   = { alignment:{horizontal:'right'}, font:{sz:10} };
+  const numStyleR  = { alignment:{horizontal:'right'}, font:{sz:10,color:{rgb:'CC2222'}}, fill:{fgColor:{rgb:'FFF0F0'}} };
+  const numStyleG  = { alignment:{horizontal:'right'}, font:{sz:10,color:{rgb:'147A3C'}}, fill:{fgColor:{rgb:'F0FAF4'}} };
+  const pillR      = { font:{bold:true,sz:9,color:{rgb:'CC2222'}}, alignment:{horizontal:'center'}, fill:{fgColor:{rgb:'FFE5E5'}} };
+  const pillY      = { font:{bold:true,sz:9,color:{rgb:'B87D00'}}, alignment:{horizontal:'center'}, fill:{fgColor:{rgb:'FEF3C7'}} };
+  const pillG      = { font:{bold:true,sz:9,color:{rgb:'147A3C'}}, alignment:{horizontal:'center'}, fill:{fgColor:{rgb:'E6F9EE'}} };
+  const skuStyle   = { font:{sz:9,color:{rgb:'444444'}}, fill:{fgColor:{rgb:'EEEEF4'}}, alignment:{horizontal:'center'} };
+  const altStyle   = { fill:{fgColor:{rgb:'F8F9FC'}} };
+
+  function cellRef(r,c){ return XLSX.utils.encode_cell({r,c}); }
+
+  // Apply title row
+  ws[cellRef(0,0)] = { v: wsData[0][0], t:'s', s: titleStyle };
+  ws[cellRef(1,0)] = { v: wsData[1][0], t:'s', s: subStyle };
+
+  // Apply header row (row index 3)
+  const headers = wsData[3];
+  headers.forEach((h,c) => {
+    ws[cellRef(3,c)] = { v: h, t:'s', s: headerStyle };
+  });
+
+  // Apply data rows
+  rows.forEach((r, i) => {
+    const rowIdx = 4 + i;
+    const isAlt = i % 2 === 1;
+    const base = isAlt ? altStyle : {};
+    const status = getStatus(r);
+
+    // SKU
+    ws[cellRef(rowIdx,0)] = { v: r.sku, t:'s', s: {...skuStyle} };
+    // Produto
+    ws[cellRef(rowIdx,1)] = { v: r.produto, t:'s', s: { font:{sz:10}, ...(isAlt?altStyle:{}) } };
+    // Tecido
+    ws[cellRef(rowIdx,2)] = { v: r.tipo_tecido||'N/A', t:'s', s: { font:{sz:10}, alignment:{horizontal:'center'}, ...(isAlt?altStyle:{}) } };
+    // Custo tecido
+    const ct = r.custo_tecido != null ? r.custo_tecido : '';
+    ws[cellRef(rowIdx,3)] = { v: ct, t: ct!==''?'n':'s', s: { ...numStyle, ...(isAlt?altStyle:{}) }, z: ct!==''?'"R$"#,##0.00':'' };
+    // Estoque físico
+    ws[cellRef(rowIdx,4)] = { v: r.estoque_fisico, t:'n', s: r.estoque_fisico < 0 ? numStyleR : {...numStyle,...base}, z:'#,##0' };
+    // Reservado
+    ws[cellRef(rowIdx,5)] = { v: r.estoque_reservado, t:'n', s: {...numStyle,...base}, z:'#,##0' };
+    // Disponível
+    ws[cellRef(rowIdx,6)] = { v: r.estoque_disponivel, t:'n', s: r.estoque_disponivel < 0 ? numStyleR : {...numStyleG,...base}, z:'#,##0' };
+    // Demanda
+    ws[cellRef(rowIdx,7)] = { v: r.demanda, t:'n', s: {...numStyle,...base}, z:'#,##0' };
+    // Gap
+    ws[cellRef(rowIdx,8)] = { v: r.gap, t:'n', s: r.gap>0 ? numStyleR : {...numStyle,...base}, z:'#,##0' };
+    // Status
+    const pillSt = status==='RUPTURA'||status==='CRÍTICO' ? (status==='CRÍTICO'?pillY:pillR) : pillG;
+    ws[cellRef(rowIdx,9)] = { v: status, t:'s', s: pillSt };
+  });
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Ruptura Geral');
+
+  // Second sheet: Priority (ruptura + demanda > 0, sorted by demanda)
+  const priority = rows.filter(r => r.ruptura && r.demanda > 0).sort((a,b)=>b.demanda-a.demanda);
+  const ws2Data = [
+    ['PANGEIA 96 — Urgência de Entrada (Ruptura + Demanda Ativa)'],
+    [`Gerado em: ${DATA.generated || new Date().toLocaleString('pt-BR')}   |   ${priority.length} itens prioritários`],
+    [],
+    ['#', 'SKU', 'Produto', 'Tipo de Tecido', 'Custo Tecido/pc (R$)', 'Demanda', 'Estoque Físico', 'Reservado', 'Disponível', 'Gap de Entrada', 'Custo Total Gap (R$)'],
+    ...priority.map((r,i) => [
+      i+1, r.sku, r.produto, r.tipo_tecido||'N/A',
+      r.custo_tecido!=null?r.custo_tecido:'',
+      r.demanda, r.estoque_fisico, r.estoque_reservado, r.estoque_disponivel, r.gap,
+      r.custo_tecido!=null ? Math.round(r.gap * r.custo_tecido) : ''
+    ])
+  ];
+
+  const ws2 = XLSX.utils.aoa_to_sheet(ws2Data);
+  ws2['!cols'] = [{wch:5},{wch:16},{wch:38},{wch:16},{wch:20},{wch:12},{wch:16},{wch:14},{wch:14},{wch:14},{wch:20}];
+  ws2['!merges'] = [{s:{r:0,c:0},e:{r:0,c:10}},{s:{r:1,c:0},e:{r:1,c:10}}];
+  ws2[cellRef(0,0)] = { v: ws2Data[0][0], t:'s', s: {...titleStyle, fill:{fgColor:{rgb:'E84040'}}, font:{bold:true,sz:13,color:{rgb:'FFFFFF'}}} };
+  ws2[cellRef(1,0)] = { v: ws2Data[1][0], t:'s', s: subStyle };
+  ws2Data[3].forEach((h,c) => { ws2[cellRef(3,c)] = { v:h, t:'s', s: headerStyle }; });
+  priority.forEach((r,i) => {
+    const ri = 4+i;
+    const alt = i%2===1;
+    ws2[cellRef(ri,0)] = {v:i+1,t:'n',s:{alignment:{horizontal:'center'},font:{sz:10,bold:i<3,color:{rgb:i<3?'B87D00':'888888'}}}};
+    ws2[cellRef(ri,1)] = {v:r.sku,t:'s',s:skuStyle};
+    ws2[cellRef(ri,2)] = {v:r.produto,t:'s',s:{font:{sz:10}}};
+    ws2[cellRef(ri,3)] = {v:r.tipo_tecido||'N/A',t:'s',s:{font:{sz:10},alignment:{horizontal:'center'}}};
+    const ct2 = r.custo_tecido!=null?r.custo_tecido:'';
+    ws2[cellRef(ri,4)] = {v:ct2,t:ct2!==''?'n':'s',z:ct2!==''?'"R$"#,##0.00':'',s:numStyle};
+    ws2[cellRef(ri,5)] = {v:r.demanda,t:'n',s:{...numStyle,font:{sz:10,bold:true,color:{rgb:'B87D00'}}},z:'#,##0'};
+    ws2[cellRef(ri,6)] = {v:r.estoque_fisico,t:'n',s:r.estoque_fisico<0?numStyleR:numStyle,z:'#,##0'};
+    ws2[cellRef(ri,7)] = {v:r.estoque_reservado,t:'n',s:numStyle,z:'#,##0'};
+    ws2[cellRef(ri,8)] = {v:r.estoque_disponivel,t:'n',s:numStyleR,z:'#,##0'};
+    ws2[cellRef(ri,9)] = {v:r.gap,t:'n',s:{...numStyleR,font:{sz:10,bold:true,color:{rgb:'CC2222'}}},z:'#,##0'};
+    const ct2val = r.custo_tecido!=null?Math.round(r.gap*r.custo_tecido):'';
+    ws2[cellRef(ri,10)] = {v:ct2val,t:ct2val!==''?'n':'s',z:ct2val!==''?'"R$"#,##0':'',s:{...numStyle,font:{sz:10,color:{rgb:'B87D00'}}}};
+  });
+  XLSX.utils.book_append_sheet(wb, ws2, 'Urgência de Entrada');
+
+  // Generate filename with date
+  const now = new Date();
+  const dateTag = now.toLocaleDateString('pt-BR').replace(/\//g,'-');
+  XLSX.writeFile(wb, `Pangeia96_Supply_${dateTag}.xlsx`, { bookType:'xlsx', type:'binary', cellStyles:true });
 }
 
 // ═══════════════════════════════════════════
