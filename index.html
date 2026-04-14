@@ -1260,10 +1260,15 @@ function buildFabricNeeds(){
     });
     // Orfao de estoque: tecido em estoque sem demanda projetada
     if(!matched && s.qty>0){
-      var orfKeyS=s.tecido+'||__orfao__';
+      // MVS e outros forros: marcar _isForro=true e usar chave por cor (não genérica)
+      var _isFabForro=Object.values(FORRO_CATALOG).some(function(fc){
+        return fc.tecido_forro&&fc.tecido_forro.trim().toUpperCase()===s.tecido.trim().toUpperCase();
+      });
+      var orfKeyS=_isFabForro ? (s.tecido+'||'+(s.cor||'')) : (s.tecido+'||__orfao__');
       if(!fabricNeeds[orfKeyS]) fabricNeeds[orfKeyS]={
         tecido:s.tecido,cor:s.cor||'',und:s.und,mai:0,jun:0,jul:0,mai_pcs:0,jun_pcs:0,jul_pcs:0,
-        prods:new Set(),_histRaw:{jan:0,fev:0,mar:0,apr:0},_orphan:true
+        prods:new Set(),_histRaw:{jan:0,fev:0,mar:0,apr:0},_orphan:true,
+        _isForro:_isFabForro
       };
       fabricNeeds[orfKeyS].em_estoque=(fabricNeeds[orfKeyS].em_estoque||0)+s.qty;
     }
@@ -1488,6 +1493,8 @@ function switchTab(id){
 function renderAllTabs(){
   try{renderProjFull();}catch(e){console.error('renderProjFull:',e);}
   try{renderCompra();}catch(e){console.error('renderCompra:',e);}
+  try{renderForro();}catch(e){console.error('renderForro:',e);}
+  try{renderJeans();}catch(e){console.error('renderJeans:',e);}
   try{renderConsumo();}catch(e){console.error('renderConsumo:',e);}
   try{renderHist();}catch(e){console.error('renderHist:',e);}
   try{renderGastos();}catch(e){console.error('renderGastos:',e);}
@@ -1916,13 +1923,15 @@ function renderCompra(){
     if(ta<tb) return -1; if(ta>tb) return 1;
     return b[1].liq-a[1].liq;
   });
-  // Split into calca and non-calca (exclude igor black - reserved for future Teddy Black)
-  var tecsDiversos=[], tecsJeans=[];
+  // Split into: jeans, forro, diversos
+  var tecsDiversos=[], tecsJeans=[], tecsForro=[];
   window._wipKeys={}; window._compraKeys={};
   tecs.forEach(function(e,i){
     window._wipKeys[i]=e[0]; window._compraKeys[i]=e[0];
     if(e[1].tecido.toLowerCase()==='igor black') return;
-    if(_isCalca(e[1])) tecsJeans.push([e,i]); else tecsDiversos.push([e,i]);
+    if(e[1]._isForro) tecsForro.push([e,i]);
+    else if(_isCalca(e[1])) tecsJeans.push([e,i]);
+    else tecsDiversos.push([e,i]);
   });
 
   function _calcTotals(arr){
@@ -2032,40 +2041,44 @@ function renderCompra(){
 
   // Build XLSX data
   var xlHdr=['Tecido','Cor','Un.','Jan/26','Fev/26','Mar/26','Abr Proj','Mai/26','Jun/26','Jul/26','Total 3M','WIP','Em Compra','Estoque','COMPRAR MT','COMPRAR KG','Sobra','Status','Produtos'];
-  var xlDiversos=[xlHdr.slice()], xlJeans=[xlHdr.slice()];
-  var totDiv=_calcTotals(tecsDiversos), totJns=_calcTotals(tecsJeans);
-  var totAll={mai:totDiv.mai+totJns.mai,jun:totDiv.jun+totJns.jun,jul:totDiv.jul+totJns.jul,
-              liq:totDiv.liq+totJns.liq,comprarCount:totDiv.comprarCount+totJns.comprarCount,
-              orphanCount:totDiv.orphanCount+totJns.orphanCount};
+  var xlDiversos=[xlHdr.slice()], xlForro=[xlHdr.slice()], xlJeans=[xlHdr.slice()];
+  var totDiv=_calcTotals(tecsDiversos), totForro=_calcTotals(tecsForro), totJns=_calcTotals(tecsJeans);
+  var totAll={mai:totDiv.mai+totForro.mai+totJns.mai,
+              jun:totDiv.jun+totForro.jun+totJns.jun,
+              jul:totDiv.jul+totForro.jul+totJns.jul,
+              liq:totDiv.liq+totForro.liq+totJns.liq,
+              comprarCount:totDiv.comprarCount+totForro.comprarCount+totJns.comprarCount,
+              orphanCount:totDiv.orphanCount+totForro.orphanCount+totJns.orphanCount};
 
-  var htmlDiv=_buildTable('tbl-compra-div','Tecidos Diversos & Forro','&#129528;','#5c1e96',tecsDiversos,totDiv,xlDiversos,'compra_div','Compra_Tecidos_Diversos.xlsx');
-  var htmlJns=_buildTable('tbl-compra-jns','Tecidos Calças & Jeans','&#128086;','#1e40af',tecsJeans,totJns,xlJeans,'compra_jns','Compra_Tecidos_Calcas_Jeans.xlsx');
+  var htmlDiv   =_buildTable('tbl-compra-div','Tecidos Diversos','&#129528;','#5c1e96',  tecsDiversos,totDiv,  xlDiversos,'compra_div', 'Compra_Tecidos_Diversos.xlsx');
+  var htmlForro =_buildTable('tbl-forro',     'Forro MVS',       '&#129525;','#be185d',  tecsForro,  totForro, xlForro,   'compra_forro','Compra_Forro.xlsx');
+  var htmlJns   =_buildTable('tbl-compra-jns','Jeans & Calças',  '&#128086;','#1e40af',  tecsJeans,  totJns,   xlJeans,   'compra_jns', 'Compra_Jeans.xlsx');
 
   _xlStore['compra_div']=xlDiversos;
+  _xlStore['compra_forro']=xlForro;
   _xlStore['compra_jns']=xlJeans;
-  // Combined XLSX
   var xlAll=[xlHdr.slice()];
   xlDiversos.slice(1).forEach(function(r){xlAll.push(r);});
+  xlForro.slice(1).forEach(function(r){xlAll.push(r);});
   xlJeans.slice(1).forEach(function(r){xlAll.push(r);});
   _xlStore['compra']=xlAll;
 
-  var dlAll="dlKey('compra','Sugestao_Compra_Todos_Tecidos.xlsx')";
+  var dlAll="dlKey('compra','Sugestao_Compra_Completa.xlsx')";
   document.getElementById('compra-content').innerHTML=
     '<div class="kpi-strip">'
-    +'<div class="kpi"><div class="kpi-label">Abr Projetado</div><div class="kpi-value accent">'+fmtN(s.aprProj)+'</div><div class="kpi-sub">'+fmtN(s.aprReal)+' reais x3,33</div></div>'
     +'<div class="kpi"><div class="kpi-label">Mai/26</div><div class="kpi-value green">'+fmtN(s.mayTot)+'</div><div class="kpi-sub">pecas projetadas</div></div>'
     +'<div class="kpi"><div class="kpi-label">Jun/26</div><div class="kpi-value green">'+fmtN(s.junTot)+'</div><div class="kpi-sub">pecas projetadas</div></div>'
     +'<div class="kpi"><div class="kpi-label">Jul/26</div><div class="kpi-value green">'+fmtN(s.julTot)+'</div><div class="kpi-sub">pecas projetadas</div></div>'
-    +'<div class="kpi"><div class="kpi-label">Total a Comprar</div><div class="kpi-value coral">'+totAll.comprarCount+' linhas</div><div class="kpi-sub">'+fmtD(totAll.liq,1)+' unid. total</div></div>'
-    +(totAll.orphanCount>0?'<div class="kpi" style="background:#fff8e1;border-left:3px solid #f59e0b"><div class="kpi-label" style="color:#92400e">⚠ Pedidos sem demanda</div><div class="kpi-value" style="color:#f59e0b;font-size:16px">'+totAll.orphanCount+' tecidos</div><div class="kpi-sub" style="color:#92400e">Pedido em aberto mas sem projecao de vendas</div></div>':'')
+    +'<div class="kpi"><div class="kpi-label">Total a Comprar</div><div class="kpi-value coral">'+totAll.comprarCount+' linhas</div><div class="kpi-sub">'+fmtD(totAll.liq,1)+' unid.</div></div>'
     +'</div>'
-    +'<div style="padding:0 20px;margin-bottom:8px"><button onclick="'+dlAll+'" style="'+btnStyle+'">XLSX Todos os Tecidos</button></div>'
+    +'<div style="padding:0 20px 8px"><button onclick="'+dlAll+'" style="'+btnStyle+'">&#8659; XLSX Completo</button></div>'
     +htmlDiv
-    +'<div style="border-top:3px solid #1e40af;margin:20px 20px 0;padding-top:15px"></div>'
+    +'<div style="border-top:3px solid #be185d;margin:24px 20px 0;padding-top:4px"></div>'
+    +htmlForro
+    +'<div style="border-top:3px solid #1e40af;margin:24px 20px 0;padding-top:4px"></div>'
     +htmlJns
     +renderPecasSection();
 }
-
 function renderConsumo(){
   var tecProd={};
   ['2026-05','2026-06','2026-07'].forEach(function(mes){
