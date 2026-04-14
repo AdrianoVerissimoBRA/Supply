@@ -1174,7 +1174,9 @@ function buildFabricNeeds(){
   Object.values(fabricNeeds).forEach(function(t){
     var total=t.mai+t.jun+t.jul, wip=t.wip_committed||0, compras=t.em_compra||0, estoque=t.em_estoque||0;
     t.total=round1(total); t.wip=round1(wip); t.compras=round1(compras); t.estoque=round1(estoque);
-    t.liq=round1(Math.max(0,total-wip-compras-estoque));
+    var rawLiq=round1(total-wip-compras-estoque);
+    t.liq=Math.max(0,rawLiq);
+    t.sobra=rawLiq<0?round1(Math.abs(rawLiq)):0;
     t.prods=[...t.prods].join(', ');
     t.mai=round1(t.mai); t.jun=round1(t.jun); t.jul=round1(t.jul);
     var tvol=tecVolMap[t.tecido]||1;
@@ -1830,7 +1832,7 @@ function renderCompra(){
       t.total+=d.total;t.wip+=(d.wip||0);t.compra+=(d.compras||0);t.estoque+=(d.estoque||0);
       if(d.liq>0)t.comprarCount++;
       if(d._orphan)t.orphanCount++;
-      if(d.liq<0)t.sobra+=Math.abs(d.liq);
+      t.sobra+=(d.sobra||0);
     });
     return t;
   }
@@ -1843,7 +1845,7 @@ function renderCompra(){
       if(tec!==lastTec){groupIdx++;lastTec=tec;}
       var aprP=round1(h.apr*(30/(s.APR_DAYS||9)));
       var isOrphan=!!t._orphan;
-      var sobra=t.liq<0?Math.abs(t.liq):0;
+      var sobra=t.sobra||0;
       var bg=isOrphan?'background:#fff8e1;border-left:3px solid #f59e0b':(groupIdx%2===0?'background:#f9f4ff':'background:#fff');
       xlData.push([tec,cor||'-',t.und,h.jan,h.fev,h.mar,aprP,t.mai,t.jun,t.jul,t.total,t.wip,t.compras,t.estoque||0,t.und==='MT'?t.liq:0,t.und==='KG'?t.liq:0,sobra,t.liq>0?'COMPRAR':'COBERTO',t.prods]);
       return '<tr style="'+bg+'">'
