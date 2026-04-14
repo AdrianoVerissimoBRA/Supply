@@ -1111,6 +1111,27 @@ function buildFabricNeeds(){
       consumo:fab.consumo, und:fab.und, wipTotal:wipVal, contrib:wipVal
     });
   });
+  // ── FORRO WIP: abate forro já consumido pelas peças em corte/costura ──
+  rawWIP.forEach(function(r){
+    var prod=String(r.PRODUTO||'').trim().toUpperCase();
+    var emCorte=parseFloat(r['EM CORTE'])||0;
+    var emCostura=parseFloat(r['EM COSTURA'])||0;
+    var wip=emCorte+emCostura;
+    if(!wip||!prod) return;
+    var fCat=FORRO_CATALOG[prod]; if(!fCat||!fCat.consumo_forro||!fCat.tecido_forro) return;
+    var forroTecUP=fCat.tecido_forro.trim().toUpperCase();
+    var _IGNORE_F={'FORRO DE BOLSO':1,'HELANCA':1,'NATURAL RUFLE':1,'MICRO JERSEY':1};
+    if(_IGNORE_F[forroTecUP]) return;
+    var forroTec=fCat.tecido_forro.trim();
+    var wipCor=normalizeCor(String(r.COR||'').trim())||'Branco';
+    var forroKey=forroTec+'||'+wipCor;
+    // MVS: consumo em MT → KG
+    var isMVS=(forroTecUP==='MVS');
+    var cons_mt=wip*fCat.consumo_forro;
+    var wipForroVal=isMVS ? round1(cons_mt/2.53) : round1(cons_mt);
+    if(!fabricNeeds[forroKey]) return; // só abate se já existe demanda projetada
+    fabricNeeds[forroKey].wip_committed=(fabricNeeds[forroKey].wip_committed||0)+wipForroVal;
+  });
   // ── FORRO: necessidade de tecido de forro por cor do produto ──
   // Consumo em col Q é em METROS. 1 KG de MVS rende 2,53 MT → dividir por 2.53 para obter KG.
   var MVS_MT_POR_KG = 2.53;
@@ -2163,9 +2184,14 @@ function renderGastos(){
       var isMatch=!!ct;
       if(!ct) ct=avgCost;
       var qty=r.qty||0;
+      // Forro MVS: custo adicional de tecido por peça (R$ 38,61/KG × consumo_forro/2,53)
+      var _fCat=FORRO_CATALOG[modelo];
+      var _forroKgPc=(_fCat&&_fCat.consumo_forro&&_fCat.tecido_forro&&_fCat.tecido_forro.toUpperCase()==='MVS')
+                      ? _fCat.consumo_forro/2.53 : 0;
+      var _forroCustoPc=round1(_forroKgPc*38.61);
       totais[mk].corte+=ct.k*qty;
       totais[mk].costura+=ct.c*qty;
-      totais[mk].tecido+=ct.t*qty;
+      totais[mk].tecido+=(ct.t+_forroCustoPc)*qty;
       totais[mk].aviamento+=ct.a*qty;
       totais[mk].composicao+=ct.p*qty;
       totais[mk].pcs+=qty;
@@ -2173,7 +2199,10 @@ function renderGastos(){
       // Detalhe por produto
       if(!prodDetail[modelo]) prodDetail[modelo]={modelo:modelo,cat:r.categoria||'',mai_q:0,jun_q:0,jul_q:0,mai_c:0,jun_c:0,jul_c:0,ct:ct,matched:isMatch};
       var pd=prodDetail[modelo];
-      var custo_pc=ct.c+ct.k+ct.t+ct.a+ct.p;
+      var _fCat2=FORRO_CATALOG[modelo];
+      var _forroExtra=(_fCat2&&_fCat2.consumo_forro&&_fCat2.tecido_forro&&_fCat2.tecido_forro.toUpperCase()==='MVS')
+                       ? round1(_fCat2.consumo_forro/2.53*38.61) : 0;
+      var custo_pc=ct.c+ct.k+(ct.t+_forroExtra)+ct.a+ct.p;
       if(mi===0){pd.mai_q+=qty;pd.mai_c+=custo_pc*qty;}
       if(mi===1){pd.jun_q+=qty;pd.jun_c+=custo_pc*qty;}
       if(mi===2){pd.jul_q+=qty;pd.jul_c+=custo_pc*qty;}
