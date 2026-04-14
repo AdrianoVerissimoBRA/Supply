@@ -1804,115 +1804,155 @@ function renderPecasSection(){
 
 function renderCompra(){
   var s=window._summary||{};
+  var _CALCA_FABRICS={'eclipse blue black':1,'felipe':1,'hanks pt':1,'santorini':1,'sarja delfi paranatex':1,'trincado color':1,'igor black':1,'madruga vintage':1};
+  function _isCalca(t){var c=(t.cor||'').toLowerCase(),f=(t.tecido||'').toLowerCase();return c.indexOf('jeans')>=0||!!_CALCA_FABRICS[f];}
   var tecs=Object.entries(fabricNeeds).sort(function(a,b){
     var ta=a[1].tecido.toLowerCase(), tb=b[1].tecido.toLowerCase();
     if(ta<tb) return -1; if(ta>tb) return 1;
     return b[1].liq-a[1].liq;
   });
-  var totMai=tecs.reduce(function(a,e){return a+e[1].mai;},0);
-  var totJun=tecs.reduce(function(a,e){return a+e[1].jun;},0);
-  var totJul=tecs.reduce(function(a,e){return a+e[1].jul;},0);
-  var totLiq=tecs.reduce(function(a,e){return a+e[1].liq;},0);
-  var totLiqMT=0,totLiqKG=0;
-  tecs.forEach(function(e){var t=e[1];if(t.und==='MT')totLiqMT+=t.liq;else if(t.und==='KG')totLiqKG+=t.liq;});
-  var totJan=0,totFev=0,totMar=0,totAprP=0,totTotal=0,totWip=0,totCompra=0,totEstoque=0;
-  tecs.forEach(function(e){
-    var t=e[1], h=t.hist||{jan:0,fev:0,mar:0,apr:0};
-    totJan+=h.jan; totFev+=h.fev; totMar+=h.mar;
-    totAprP+=round1(h.apr*(30/(s.APR_DAYS||9)));
-    totTotal+=t.total; totWip+=(t.wip||0); totCompra+=(t.compras||0); totEstoque+=(t.estoque||0);
+  // Split into calca and non-calca (exclude igor black - reserved for future Teddy Black)
+  var tecsDiversos=[], tecsJeans=[];
+  window._wipKeys={}; window._compraKeys={};
+  tecs.forEach(function(e,i){
+    window._wipKeys[i]=e[0]; window._compraKeys[i]=e[0];
+    if(e[1].tecido.toLowerCase()==='igor black') return;
+    if(_isCalca(e[1])) tecsJeans.push([e,i]); else tecsDiversos.push([e,i]);
   });
-  var xlData=[['Tecido','Cor','Un.','Jan/26','Fev/26','Mar/26','Abr Proj','Mai/26','Jun/26','Jul/26','Total 3M','WIP','Em Compra','Estoque','COMPRAR MT','COMPRAR KG','Status','Produtos']];
-  var lastTec='', groupIdx=-1;
-  window._wipKeys={}; window._compraKeys={}; var _wipIdx=0;
-  var rows=tecs.map(function(e,i){
-    _wipIdx=i; window._wipKeys[i]=e[0]; window._compraKeys[i]=e[0];
-    var tec=e[1].tecido, t=e[1], cor=t.cor, h=t.hist||{jan:0,fev:0,mar:0,apr:0};
-    if(tec!==lastTec){groupIdx++;lastTec=tec;}
-    var aprP=round1(h.apr*(30/(s.APR_DAYS||9)));
-    var isOrphan=!!t._orphan;
-    var bg=isOrphan?'background:#fff8e1;border-left:3px solid #f59e0b':(groupIdx%2===0?'background:#f9f4ff':'background:#fff');
-    xlData.push([tec,cor||'-',t.und,h.jan,h.fev,h.mar,aprP,t.mai,t.jun,t.jul,t.total,t.wip,t.compras,t.estoque||0,t.und==='MT'?t.liq:0,t.und==='KG'?t.liq:0,t.liq>0?'COMPRAR':'COBERTO',t.prods]);
-    return '<tr style="'+bg+'">'
-      +'<td style="font-weight:600">'+tec+(isOrphan?' <span style="font-size:9px;background:#f59e0b;color:#fff;border-radius:4px;padding:1px 5px;vertical-align:middle">SEM DEMANDA</span>':'')+'</td>'
-      +'<td>'+(isOrphan?'<span style="color:#f59e0b;font-size:10px;font-weight:700">⚠ Pedido órfão</span>':(cor?pill(cor,'#1e3a8a','#dbeafe'):'<span style="color:#bbb;font-size:10px">—</span>'))+'</td>'
-      +'<td>'+pill(t.und,'#5c1e96','#ede0ff')+'</td>'
-      +'<td class="num" style="color:#777">'+fmtD(h.jan,1)+'</td>'
-      +'<td class="num" style="color:#777">'+fmtD(h.fev,1)+'</td>'
-      +'<td class="num" style="color:#777">'+fmtD(h.mar,1)+'</td>'
-      +'<td class="num" style="color:#d97706;font-weight:600">'+fmtD(aprP,1)+'</td>'
-      +'<td class="num" style="color:#0ea86e;font-weight:600">'+fmtD(t.mai,1)+'</td>'
-      +'<td class="num" style="color:#0ea86e;font-weight:600">'+fmtD(t.jun,1)+'</td>'
-      +'<td class="num" style="color:#0ea86e;font-weight:600">'+fmtD(t.jul,1)+'</td>'
-      +'<td class="num bold">'+fmtD(t.total,1)+' '+t.und+'</td>'
-      +'<td class="num" style="color:#e74c3c;cursor:pointer" onclick="_wipClick('+i+')" title="Clique para ver detalhamento WIP">'
-      +(t.wip>0?'<span style="text-decoration:underline;text-decoration-style:dotted">-'+fmtD(t.wip,1)+'</span> <span style="font-size:10px">&#9432;</span>':'--')+'</td>'
-      +'<td class="num" style="color:#27ae60;cursor:pointer" onclick="_compraClick('+i+')" title="Clique para ver pedidos em compra">'
-      +(t.compras>0?'<span style="text-decoration:underline;text-decoration-style:dotted">-'+fmtD(t.compras,1)+'</span> <span style="font-size:10px">&#9432;</span>':'--')+'</td>'
-      +'<td class="num" style="color:#2563eb">'+(t.estoque>0?'-'+fmtD(t.estoque,1):'--')+'</td>'
-      +'<td class="num bold" style="color:'+(t.und==='MT'&&t.liq>0?'#b91c1c':'#aaa')+'">'+(t.und==='MT'&&t.liq>0?fmtD(t.liq,1):'--')+'</td>'
-      +'<td class="num bold" style="color:'+(t.und==='KG'&&t.liq>0?'#b91c1c':'#aaa')+'">'+(t.und==='KG'&&t.liq>0?fmtD(t.liq,1):'--')+'</td>'
-      +'<td>'+statusBadge(t.liq,t.total)+'</td>'
-      +'<td style="font-size:10px;color:#888;max-width:140px;white-space:normal">'+t.prods+'</td>'
-      +'</tr>';
-  }).join('');
-  _xlStore['compra']=xlData;
-  var dl="dlKey('compra','Sugestao_Compra_Tecidos.xlsx')";
+
+  function _calcTotals(arr){
+    var t={mai:0,jun:0,jul:0,liq:0,liqMT:0,liqKG:0,jan:0,fev:0,mar:0,aprP:0,total:0,wip:0,compra:0,estoque:0,comprarCount:0,orphanCount:0};
+    arr.forEach(function(item){
+      var d=item[0][1], h=d.hist||{jan:0,fev:0,mar:0,apr:0};
+      t.mai+=d.mai;t.jun+=d.jun;t.jul+=d.jul;t.liq+=d.liq;
+      if(d.und==='MT')t.liqMT+=d.liq; else if(d.und==='KG')t.liqKG+=d.liq;
+      t.jan+=h.jan;t.fev+=h.fev;t.mar+=h.mar;t.aprP+=round1(h.apr*(30/(s.APR_DAYS||9)));
+      t.total+=d.total;t.wip+=(d.wip||0);t.compra+=(d.compras||0);t.estoque+=(d.estoque||0);
+      if(d.liq>0)t.comprarCount++;
+      if(d._orphan)t.orphanCount++;
+    });
+    return t;
+  }
+
+  function _buildRows(arr,xlData){
+    var lastTec='',groupIdx=-1;
+    return arr.map(function(item){
+      var e=item[0],i=item[1];
+      var tec=e[1].tecido, t=e[1], cor=t.cor, h=t.hist||{jan:0,fev:0,mar:0,apr:0};
+      if(tec!==lastTec){groupIdx++;lastTec=tec;}
+      var aprP=round1(h.apr*(30/(s.APR_DAYS||9)));
+      var isOrphan=!!t._orphan;
+      var bg=isOrphan?'background:#fff8e1;border-left:3px solid #f59e0b':(groupIdx%2===0?'background:#f9f4ff':'background:#fff');
+      xlData.push([tec,cor||'-',t.und,h.jan,h.fev,h.mar,aprP,t.mai,t.jun,t.jul,t.total,t.wip,t.compras,t.estoque||0,t.und==='MT'?t.liq:0,t.und==='KG'?t.liq:0,t.liq>0?'COMPRAR':'COBERTO',t.prods]);
+      return '<tr style="'+bg+'">'
+        +'<td style="font-weight:600">'+tec+(isOrphan?' <span style="font-size:9px;background:#f59e0b;color:#fff;border-radius:4px;padding:1px 5px;vertical-align:middle">SEM DEMANDA</span>':'')+'</td>'
+        +'<td>'+(isOrphan?'<span style="color:#f59e0b;font-size:10px;font-weight:700">⚠ Pedido órfão</span>':(cor?pill(cor,'#1e3a8a','#dbeafe'):'<span style="color:#bbb;font-size:10px">—</span>'))+'</td>'
+        +'<td>'+pill(t.und,'#5c1e96','#ede0ff')+'</td>'
+        +'<td class="num" style="color:#777">'+fmtD(h.jan,1)+'</td>'
+        +'<td class="num" style="color:#777">'+fmtD(h.fev,1)+'</td>'
+        +'<td class="num" style="color:#777">'+fmtD(h.mar,1)+'</td>'
+        +'<td class="num" style="color:#d97706;font-weight:600">'+fmtD(aprP,1)+'</td>'
+        +'<td class="num" style="color:#0ea86e;font-weight:600">'+fmtD(t.mai,1)+'</td>'
+        +'<td class="num" style="color:#0ea86e;font-weight:600">'+fmtD(t.jun,1)+'</td>'
+        +'<td class="num" style="color:#0ea86e;font-weight:600">'+fmtD(t.jul,1)+'</td>'
+        +'<td class="num bold">'+fmtD(t.total,1)+' '+t.und+'</td>'
+        +'<td class="num" style="color:#e74c3c;cursor:pointer" onclick="_wipClick('+i+')" title="Clique para ver detalhamento WIP">'
+        +(t.wip>0?'<span style="text-decoration:underline;text-decoration-style:dotted">-'+fmtD(t.wip,1)+'</span> <span style="font-size:10px">&#9432;</span>':'--')+'</td>'
+        +'<td class="num" style="color:#27ae60;cursor:pointer" onclick="_compraClick('+i+')" title="Clique para ver pedidos em compra">'
+        +(t.compras>0?'<span style="text-decoration:underline;text-decoration-style:dotted">-'+fmtD(t.compras,1)+'</span> <span style="font-size:10px">&#9432;</span>':'--')+'</td>'
+        +'<td class="num" style="color:#2563eb">'+(t.estoque>0?'-'+fmtD(t.estoque,1):'--')+'</td>'
+        +'<td class="num bold" style="color:'+(t.und==='MT'&&t.liq>0?'#b91c1c':'#aaa')+'">'+(t.und==='MT'&&t.liq>0?fmtD(t.liq,1):'--')+'</td>'
+        +'<td class="num bold" style="color:'+(t.und==='KG'&&t.liq>0?'#b91c1c':'#aaa')+'">'+(t.und==='KG'&&t.liq>0?fmtD(t.liq,1):'--')+'</td>'
+        +'<td>'+statusBadge(t.liq,t.total)+'</td>'
+        +'<td style="font-size:10px;color:#888;max-width:140px;white-space:normal">'+t.prods+'</td>'
+        +'</tr>';
+    }).join('');
+  }
+
+  function _buildTable(tblId,title,icon,titleColor,arr,tot,xlData,xlKey,xlFile){
+    var dl="dlKey('"+xlKey+"','"+xlFile+"')";
+    return '<div style="padding:0 20px 20px">'
+      +'<div class="section-title"><span class="section-bar" style="background:'+titleColor+'"></span>'+icon+' '+title
+      +'<button onclick="'+dl+'" style="margin-left:10px;'+btnStyle+'">XLSX</button>'
+      +'<span style="font-size:11px;font-weight:400;color:#888;margin-left:8px">'+arr.length+' linhas</span></div>'
+      +'<div style="font-size:11px;color:#888;margin-bottom:10px">Cinza=historico real | Amarelo=Abr projetado | Verde=projecao | Agrupado por tecido+cor</div>'
+      +'<div class="table-wrap"><table id="'+tblId+'"><thead>'
+      +'<tr><th rowspan="2" onclick="sortTbl(&#39;'+tblId+'&#39;,0)">Tecido</th>'
+      +'<th rowspan="2" onclick="sortTbl(&#39;'+tblId+'&#39;,1)">Cor</th>'
+      +'<th rowspan="2" onclick="sortTbl(&#39;'+tblId+'&#39;,2)">Un.</th>'
+      +'<th colspan="3" style="text-align:center;background:#e8e8f0;border-bottom:1px solid #ccc">Historico Real</th>'
+      +'<th style="text-align:center;background:#fef9ec">Abr Proj</th>'
+      +'<th colspan="3" style="text-align:center;background:#f0fdf4;border-bottom:1px solid #ccc">Projetado</th>'
+      +'<th rowspan="2" onclick="sortTbl(&#39;'+tblId+'&#39;,10)">Total 3M</th>'
+      +'<th rowspan="2" onclick="sortTbl(&#39;'+tblId+'&#39;,11)">-WIP</th>'
+      +'<th rowspan="2" onclick="sortTbl(&#39;'+tblId+'&#39;,12)">-Compra</th>'
+      +'<th rowspan="2" onclick="sortTbl(&#39;'+tblId+'&#39;,13)" style="color:#2563eb">-Estoque</th>'
+      +'<th rowspan="2" onclick="sortTbl(&#39;'+tblId+'&#39;,14)" style="color:#b91c1c">COMPRAR MT</th>'
+      +'<th rowspan="2" onclick="sortTbl(&#39;'+tblId+'&#39;,15)" style="color:#b91c1c">COMPRAR KG</th>'
+      +'<th rowspan="2" onclick="sortTbl(&#39;'+tblId+'&#39;,16)">Status</th>'
+      +'<th rowspan="2" onclick="sortTbl(&#39;'+tblId+'&#39;,17)">Produtos</th></tr>'
+      +'<tr><th onclick="sortTbl(&#39;'+tblId+'&#39;,3)" style="background:#e8e8f0">Jan</th>'
+      +'<th onclick="sortTbl(&#39;'+tblId+'&#39;,4)" style="background:#e8e8f0">Fev</th>'
+      +'<th onclick="sortTbl(&#39;'+tblId+'&#39;,5)" style="background:#e8e8f0">Mar</th>'
+      +'<th onclick="sortTbl(&#39;'+tblId+'&#39;,6)" style="background:#fef9ec">30d</th>'
+      +'<th onclick="sortTbl(&#39;'+tblId+'&#39;,7)" style="background:#f0fdf4">Mai</th>'
+      +'<th onclick="sortTbl(&#39;'+tblId+'&#39;,8)" style="background:#f0fdf4">Jun</th>'
+      +'<th onclick="sortTbl(&#39;'+tblId+'&#39;,9)" style="background:#f0fdf4">Jul</th>'
+      +'</tr>'
+      +'<tr class="totals-row" style="background:#f3f0ff;border-bottom:2px solid '+titleColor+'">'
+      +'<th style="font-weight:800;color:'+titleColor+';font-size:13px;text-align:left">TOTAL</th>'
+      +'<th></th><th></th>'
+      +'<th class="num bold" style="color:#777">'+fmtD(tot.jan,1)+'</th>'
+      +'<th class="num bold" style="color:#777">'+fmtD(tot.fev,1)+'</th>'
+      +'<th class="num bold" style="color:#777">'+fmtD(tot.mar,1)+'</th>'
+      +'<th class="num bold" style="color:#d97706">'+fmtD(tot.aprP,1)+'</th>'
+      +'<th class="num bold" style="color:#0ea86e">'+fmtD(tot.mai,1)+'</th>'
+      +'<th class="num bold" style="color:#0ea86e">'+fmtD(tot.jun,1)+'</th>'
+      +'<th class="num bold" style="color:#0ea86e">'+fmtD(tot.jul,1)+'</th>'
+      +'<th class="num bold">'+fmtD(tot.total,1)+'</th>'
+      +'<th class="num bold" style="color:#e74c3c">'+(tot.wip>0?'-'+fmtD(tot.wip,1):'--')+'</th>'
+      +'<th class="num bold" style="color:#27ae60">'+(tot.compra>0?'-'+fmtD(tot.compra,1):'--')+'</th>'
+      +'<th class="num bold" style="color:#2563eb">'+(tot.estoque>0?'-'+fmtD(tot.estoque,1):'--')+'</th>'
+      +'<th class="num bold" style="color:#b91c1c;font-size:14px">'+fmtD(tot.liqMT,1)+'</th>'
+      +'<th class="num bold" style="color:#b91c1c;font-size:14px">'+fmtD(tot.liqKG,1)+'</th>'
+      +'<th></th><th></th></tr>'
+      +'</thead><tbody>'
+      +_buildRows(arr,xlData)+'</tbody></table></div></div>';
+  }
+
+  // Build XLSX data
+  var xlHdr=['Tecido','Cor','Un.','Jan/26','Fev/26','Mar/26','Abr Proj','Mai/26','Jun/26','Jul/26','Total 3M','WIP','Em Compra','Estoque','COMPRAR MT','COMPRAR KG','Status','Produtos'];
+  var xlDiversos=[xlHdr.slice()], xlJeans=[xlHdr.slice()];
+  var totDiv=_calcTotals(tecsDiversos), totJns=_calcTotals(tecsJeans);
+  var totAll={mai:totDiv.mai+totJns.mai,jun:totDiv.jun+totJns.jun,jul:totDiv.jul+totJns.jul,
+              liq:totDiv.liq+totJns.liq,comprarCount:totDiv.comprarCount+totJns.comprarCount,
+              orphanCount:totDiv.orphanCount+totJns.orphanCount};
+
+  var htmlDiv=_buildTable('tbl-compra-div','Tecidos Diversos','&#129528;','#5c1e96',tecsDiversos,totDiv,xlDiversos,'compra_div','Compra_Tecidos_Diversos.xlsx');
+  var htmlJns=_buildTable('tbl-compra-jns','Tecidos Cal\\u00e7as \\u0026 Jeans','&#128086;','#1e40af',tecsJeans,totJns,xlJeans,'compra_jns','Compra_Tecidos_Calcas_Jeans.xlsx');
+
+  _xlStore['compra_div']=xlDiversos;
+  _xlStore['compra_jns']=xlJeans;
+  // Combined XLSX
+  var xlAll=[xlHdr.slice()];
+  xlDiversos.slice(1).forEach(function(r){xlAll.push(r);});
+  xlJeans.slice(1).forEach(function(r){xlAll.push(r);});
+  _xlStore['compra']=xlAll;
+
+  var dlAll="dlKey('compra','Sugestao_Compra_Todos_Tecidos.xlsx')";
   document.getElementById('compra-content').innerHTML=
     '<div class="kpi-strip">'
     +'<div class="kpi"><div class="kpi-label">Abr Projetado</div><div class="kpi-value accent">'+fmtN(s.aprProj)+'</div><div class="kpi-sub">'+fmtN(s.aprReal)+' reais x3,33</div></div>'
     +'<div class="kpi"><div class="kpi-label">Mai/26</div><div class="kpi-value green">'+fmtN(s.mayTot)+'</div><div class="kpi-sub">pecas projetadas</div></div>'
     +'<div class="kpi"><div class="kpi-label">Jun/26</div><div class="kpi-value green">'+fmtN(s.junTot)+'</div><div class="kpi-sub">pecas projetadas</div></div>'
     +'<div class="kpi"><div class="kpi-label">Jul/26</div><div class="kpi-value green">'+fmtN(s.julTot)+'</div><div class="kpi-sub">pecas projetadas</div></div>'
-    +'<div class="kpi"><div class="kpi-label">Total a Comprar</div><div class="kpi-value coral">'+tecs.filter(function(e){return e[1].liq>0;}).length+' linhas</div><div class="kpi-sub">'+fmtD(totLiq,1)+' unid. total</div></div>'
-    +(tecs.filter(function(e){return e[1]._orphan;}).length>0?'<div class="kpi" style="background:#fff8e1;border-left:3px solid #f59e0b"><div class="kpi-label" style="color:#92400e">⚠ Pedidos sem demanda</div><div class="kpi-value" style="color:#f59e0b;font-size:16px">'+tecs.filter(function(e){return e[1]._orphan;}).length+' tecidos</div><div class="kpi-sub" style="color:#92400e">Pedido em aberto mas sem projecao de vendas</div></div>':'')
+    +'<div class="kpi"><div class="kpi-label">Total a Comprar</div><div class="kpi-value coral">'+totAll.comprarCount+' linhas</div><div class="kpi-sub">'+fmtD(totAll.liq,1)+' unid. total</div></div>'
+    +(totAll.orphanCount>0?'<div class="kpi" style="background:#fff8e1;border-left:3px solid #f59e0b"><div class="kpi-label" style="color:#92400e">⚠ Pedidos sem demanda</div><div class="kpi-value" style="color:#f59e0b;font-size:16px">'+totAll.orphanCount+' tecidos</div><div class="kpi-sub" style="color:#92400e">Pedido em aberto mas sem projecao de vendas</div></div>':'')
     +'</div>'
-    +'<div style="padding:0 20px 20px">'
-    +'<div class="section-title"><span class="section-bar"></span>Sugestao de Compra de TECIDOS - Hist. Jan-Abr + Projecao Mai-Jul 2026'
-    +'<button onclick="'+dl+'" style="margin-left:10px;'+btnStyle+'">XLSX</button></div>'
-    +'<div style="font-size:11px;color:#888;margin-bottom:10px">Cinza=historico real | Amarelo=Abr projetado | Verde=projecao | Agrupado por tecido+cor</div>'
-    +'<div class="table-wrap"><table id="tbl-compra"><thead>'
-    +'<tr><th rowspan="2" onclick="sortTbl(&#39;tbl-compra&#39;,0)">Tecido</th>'
-    +'<th rowspan="2" onclick="sortTbl(&#39;tbl-compra&#39;,1)">Cor</th>'
-    +'<th rowspan="2" onclick="sortTbl(&#39;tbl-compra&#39;,2)">Un.</th>'
-    +'<th colspan="3" style="text-align:center;background:#e8e8f0;border-bottom:1px solid #ccc">Historico Real</th>'
-    +'<th style="text-align:center;background:#fef9ec">Abr Proj</th>'
-    +'<th colspan="3" style="text-align:center;background:#f0fdf4;border-bottom:1px solid #ccc">Projetado</th>'
-    +'<th rowspan="2" onclick="sortTbl(&#39;tbl-compra&#39;,10)">Total 3M</th>'
-    +'<th rowspan="2" onclick="sortTbl(&#39;tbl-compra&#39;,11)">-WIP</th>'
-    +'<th rowspan="2" onclick="sortTbl(&#39;tbl-compra&#39;,12)">-Compra</th>'
-    +'<th rowspan="2" onclick="sortTbl(&#39;tbl-compra&#39;,13)" style="color:#2563eb">-Estoque</th>'
-    +'<th rowspan="2" onclick="sortTbl(&#39;tbl-compra&#39;,14)" style="color:#b91c1c">COMPRAR MT</th>'
-    +'<th rowspan="2" onclick="sortTbl(&#39;tbl-compra&#39;,15)" style="color:#b91c1c">COMPRAR KG</th>'
-    +'<th rowspan="2" onclick="sortTbl(&#39;tbl-compra&#39;,16)">Status</th>'
-    +'<th rowspan="2" onclick="sortTbl(&#39;tbl-compra&#39;,17)">Produtos</th></tr>'
-    +'<tr><th onclick="sortTbl(&#39;tbl-compra&#39;,3)" style="background:#e8e8f0">Jan</th>'
-    +'<th onclick="sortTbl(&#39;tbl-compra&#39;,4)" style="background:#e8e8f0">Fev</th>'
-    +'<th onclick="sortTbl(&#39;tbl-compra&#39;,5)" style="background:#e8e8f0">Mar</th>'
-    +'<th onclick="sortTbl(&#39;tbl-compra&#39;,6)" style="background:#fef9ec">30d</th>'
-    +'<th onclick="sortTbl(&#39;tbl-compra&#39;,7)" style="background:#f0fdf4">Mai</th>'
-    +'<th onclick="sortTbl(&#39;tbl-compra&#39;,8)" style="background:#f0fdf4">Jun</th>'
-    +'<th onclick="sortTbl(&#39;tbl-compra&#39;,9)" style="background:#f0fdf4">Jul</th>'
-    +'</tr>'
-    +'<tr class="totals-row" style="background:#f3f0ff;border-bottom:2px solid var(--accent)">'
-    +'<th style="font-weight:800;color:var(--accent);font-size:13px;text-align:left">TOTAL</th>'
-    +'<th></th><th></th>'
-    +'<th class="num bold" style="color:#777">'+fmtD(totJan,1)+'</th>'
-    +'<th class="num bold" style="color:#777">'+fmtD(totFev,1)+'</th>'
-    +'<th class="num bold" style="color:#777">'+fmtD(totMar,1)+'</th>'
-    +'<th class="num bold" style="color:#d97706">'+fmtD(totAprP,1)+'</th>'
-    +'<th class="num bold" style="color:#0ea86e">'+fmtD(totMai,1)+'</th>'
-    +'<th class="num bold" style="color:#0ea86e">'+fmtD(totJun,1)+'</th>'
-    +'<th class="num bold" style="color:#0ea86e">'+fmtD(totJul,1)+'</th>'
-    +'<th class="num bold">'+fmtD(totTotal,1)+'</th>'
-    +'<th class="num bold" style="color:#e74c3c">'+(totWip>0?'-'+fmtD(totWip,1):'--')+'</th>'
-    +'<th class="num bold" style="color:#27ae60">'+(totCompra>0?'-'+fmtD(totCompra,1):'--')+'</th>'
-    +'<th class="num bold" style="color:#2563eb">'+(totEstoque>0?'-'+fmtD(totEstoque,1):'--')+'</th>'
-    +'<th class="num bold" style="color:#b91c1c;font-size:14px">'+fmtD(totLiqMT,1)+'</th>'
-    +'<th class="num bold" style="color:#b91c1c;font-size:14px">'+fmtD(totLiqKG,1)+'</th>'
-    +'<th></th><th></th></tr>'
-    +'</thead><tbody>'
-    +rows+'</tbody></table></div></div>'
+    +'<div style="padding:0 20px;margin-bottom:8px"><button onclick="'+dlAll+'" style="'+btnStyle+'">XLSX Todos os Tecidos</button></div>'
+    +htmlDiv
+    +'<div style="border-top:3px solid #1e40af;margin:20px 20px 0;padding-top:15px"></div>'
+    +htmlJns
     +renderPecasSection();
 }
 
