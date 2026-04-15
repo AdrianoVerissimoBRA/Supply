@@ -1112,13 +1112,24 @@ function rebuildProj(){
   var def=s.defaultRate||10;
 
   // Step 1: Build per-SKU april quantities (filtered)
-  var skuApr={};
+  var skuApr={}, skuHist={};
   rawSales.forEach(function(r){
-    if(r.mes!=='2026-04') return;
     if(window._isExcluded(r.modelo,r.cor)) return;
     var k=r.modelo+'|'+r.cor+'|'+r.tamanho;
-    if(!skuApr[k]) skuApr[k]={modelo:r.modelo,cor:r.cor,tamanho:r.tamanho,categoria:r.categoria,qty:0};
-    skuApr[k].qty+=r.qty;
+    if(r.mes==='2026-04'){
+      if(!skuApr[k]) skuApr[k]={modelo:r.modelo,cor:r.cor,tamanho:r.tamanho,categoria:r.categoria,qty:0};
+      skuApr[k].qty+=r.qty;
+    }
+    // Track best historical month Jan-Mar as fallback base for items with no April data
+    if(r.mes>='2026-01'&&r.mes<='2026-03'){
+      if(!skuHist[k]) skuHist[k]={modelo:r.modelo,cor:r.cor,tamanho:r.tamanho,categoria:r.categoria,best:0};
+      if(r.qty>skuHist[k].best) skuHist[k].best=r.qty;
+    }
+  });
+  // Include items with hist sales but no April data (use best hist month as base)
+  Object.keys(skuHist).forEach(function(k){
+    if(!skuApr[k]&&skuHist[k].best>0)
+      skuApr[k]={modelo:skuHist[k].modelo,cor:skuHist[k].cor,tamanho:skuHist[k].tamanho,categoria:skuHist[k].categoria,qty:skuHist[k].best,_fromHist:true};
   });
 
   // Step 2: For each SKU, project Mai/Jun/Jul using per-product rate (or global default)
@@ -1127,7 +1138,7 @@ function rebuildProj(){
 
   Object.keys(skuApr).forEach(function(pk){
     var sku=skuApr[pk];
-    var aprBase=Math.round(sku.qty*(30/APR_DAYS));
+    var aprBase=sku._fromHist ? sku.qty : Math.round(sku.qty*(30/APR_DAYS));
     var skuRate=pr[pk]||{};
     var rMai=skuRate.mai!==undefined?parseFloat(skuRate.mai):def;
     var rJun=rMai; // Jun e Jul herdam taxa de Mai (campo único)
