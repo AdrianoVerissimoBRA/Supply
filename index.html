@@ -1080,7 +1080,13 @@ function buildFabricNeeds(){
     var prod=String(r.PRODUTO||'').trim().toUpperCase();
     var emCorte=parseFloat(r['EM CORTE'])||0;
     var emCostura=parseFloat(r['EM COSTURA'])||0;
-    var wip=emCorte+emCostura;
+    var corteRealWip=parseFloat(r['CORTE REAL'])||0;
+    // STATUS BD fallback: COSTURA usa EM_COSTURA → CORTE_REAL; CORTE usa EM_CORTE
+    var statusWip=(r['STATUS BD']||'').toUpperCase();
+    var wip;
+    if(statusWip==='COSTURA') wip=(emCostura||corteRealWip);
+    else if(statusWip==='CORTE') wip=emCorte;
+    else wip=emCorte+emCostura; // ACABAMENTO ou outro
     if(!wip||!prod) return;
     var fab=CATALOG[prod]; if(!fab||!fab.tecido) return;
     if(_isTricot(fab.tecido)) return;
@@ -1120,7 +1126,13 @@ function buildFabricNeeds(){
     var prod=String(r.PRODUTO||'').trim().toUpperCase();
     var emCorte=parseFloat(r['EM CORTE'])||0;
     var emCostura=parseFloat(r['EM COSTURA'])||0;
-    var wip=emCorte+emCostura;
+    var corteRealWip=parseFloat(r['CORTE REAL'])||0;
+    // STATUS BD fallback: COSTURA usa EM_COSTURA → CORTE_REAL; CORTE usa EM_CORTE
+    var statusWip=(r['STATUS BD']||'').toUpperCase();
+    var wip;
+    if(statusWip==='COSTURA') wip=(emCostura||corteRealWip);
+    else if(statusWip==='CORTE') wip=emCorte;
+    else wip=emCorte+emCostura; // ACABAMENTO ou outro
     if(!wip||!prod) return;
     var fCat=FORRO_CATALOG[prod]; if(!fCat||!fCat.consumo_forro||!fCat.tecido_forro) return;
     var forroTecUP=fCat.tecido_forro.trim().toUpperCase();
@@ -1774,9 +1786,19 @@ function buildPecasView(){
   function normC(c){
     c=(c||'').trim();
     var up=c.toUpperCase();
-    if(up==='OFF WHITE'||up==='OFF-WHITE') return 'Branco';
-    if(up==='PT') return 'Preto';
-    if(up==='-'||up==='UNICA'||up==='') return '';
+    if(!c||up==='-'||up==='UNICA') return '';
+    // Aliases
+    if(up==='OFF WHITE'||up==='OFF-WHITE'||up==='OFFWHITE'||up==='BRANCA') return 'Branco';
+    if(up==='PT'||up==='PRETA') return 'Preto';
+    if(up==='VERMELHA') return 'Vermelho';
+    if(up==='AMARELA') return 'Amarelo';
+    if(up==='ROXA') return 'Roxo';
+    if(up==='CINZA ESCURA') return 'Cinza Escuro';
+    if(up==='AZUL ESCURA') return 'Azul Escuro';
+    if(up==='ROSA ESCURA') return 'Rosa Escuro';
+    if(up==='VERDE ESCURA') return 'Verde Escuro';
+    if(up==='DOURADA') return 'Dourado';
+    // Capitalize each word
     return c.split(' ').map(function(w){return w.charAt(0).toUpperCase()+w.slice(1).toLowerCase();}).join(' ');
   }
   function makeKey(m,c){return m.toUpperCase()+'|'+normC(c).toLowerCase();}
@@ -1807,10 +1829,11 @@ function buildPecasView(){
     var status=(w['STATUS BD']||'').toUpperCase();
     var emC=parseFloat(w['EM CORTE'])||0;
     var emCos=parseFloat(w['EM COSTURA'])||0;
+    var corteReal=parseFloat(w['CORTE REAL'])||0;
     var fin=parseFloat(w.FINALIZADO)||0;
     var proj=parseFloat(w['PROJEÇÃO'])||0;
     if(status==='CORTE') pos[key].corte+=(emC||proj);
-    else if(status==='COSTURA') pos[key].costura+=(emCos||proj);
+    else if(status==='COSTURA') pos[key].costura+=(emCos||corteReal||proj);
     else if(status==='ACABAMENTO') pos[key].acab+=(fin||proj);
   });
   var aprD=(window._summary||{}).APR_DAYS||8;
