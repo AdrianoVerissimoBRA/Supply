@@ -411,11 +411,6 @@ function useLastSession() {
       if(maxMonth<500) window._excludedMC[mc]=maxMonth;
     });
     // Não excluir modelo+cor que existe explicitamente no CATALOG_COLOR (cor definida na planilha)
-    Object.keys(CATALOG_COLOR).forEach(function(ccKey){
-      var parts=ccKey.split('||');
-      var mc=(parts[0]||'').toUpperCase()+'||'+(parts[1]||'').toLowerCase();
-      if(window._excludedMC.hasOwnProperty(mc)&&window._excludedMC[mc]>0) delete window._excludedMC[mc];
-    });
     var exSet=window._excludedMC;
     window._isExcluded=function(modelo,cor){
       if(!window._filterEnabled) return false;
@@ -1032,14 +1027,7 @@ function calculateAll(){
   });
   
   // Não excluir cores definidas em CATALOG_COLOR
-  Object.keys(CATALOG_COLOR).forEach(function(ccKey){
-    var parts=ccKey.split('||');
-    var mc=(parts[0]||'').toUpperCase()+'||'+(parts[1]||'').toLowerCase();
-    if(window._excludedMC.hasOwnProperty(mc) && window._excludedMC[mc]>0){
-      delete window._excludedMC[mc];
-    }
-  });
-  var exSet=window._excludedMC;
+var exSet=window._excludedMC;
   window._isExcluded=function(modelo,cor){
     if(!window._filterEnabled) return false;
     var mc=(modelo||'').toUpperCase()+'||'+(cor||'').toLowerCase();
@@ -1080,11 +1068,6 @@ function rebuildProj(){
       if(maxMonth<500) window._excludedMC[mc]=maxMonth;
     });
     // Não excluir modelo+cor que existe explicitamente no CATALOG_COLOR (cor definida na planilha)
-    Object.keys(CATALOG_COLOR).forEach(function(ccKey){
-      var parts=ccKey.split('||');
-      var mc=(parts[0]||'').toUpperCase()+'||'+(parts[1]||'').toLowerCase();
-      if(window._excludedMC.hasOwnProperty(mc)&&window._excludedMC[mc]>0) delete window._excludedMC[mc];
-    });
     var exSet=window._excludedMC;
     window._isExcluded=function(modelo,cor){
       if(!window._filterEnabled) return false;
@@ -1118,20 +1101,15 @@ function rebuildProj(){
       skuApr[k]={modelo:skuHist[k].modelo,cor:skuHist[k].cor,tamanho:skuHist[k].tamanho,categoria:skuHist[k].categoria,qty:skuHist[k].best,_fromHist:true};
   });
 
-  // Step 2: Normaliza aprBase para que sum(aprBase) == APR_PROJ
-  // Garante: total Mai = APR_PROJ × (1+taxa) — coerente com KPI
-  var _sumAprBase=0;
-  Object.values(skuApr).forEach(function(sku){
-    _sumAprBase+=(sku._fromHist ? sku.qty : sku.qty*(30/APR_DAYS));
-  });
-  var _normFactor=(_sumAprBase>0&&APR_PROJ>0) ? APR_PROJ/_sumAprBase : 1;
-
+  // Step 2: projData - only April items (aprBase = april × 30/APR_DAYS)
+  // _fromHist items are used only for filter thresholds, not for projection volume
   projData={'2026-05':[],'2026-06':[],'2026-07':[]};
   var pr=window._prodRates||{};
 
   Object.keys(skuApr).forEach(function(pk){
     var sku=skuApr[pk];
-    var aprBase=Math.round((sku._fromHist ? sku.qty : sku.qty*(30/APR_DAYS))*_normFactor);
+    if(sku._fromHist) return; // histórico usado só para filtro, não projeta volume
+    var aprBase=Math.round(sku.qty*(30/APR_DAYS));
     var skuRate=pr[pk]||{};
     var rMai=skuRate.mai!==undefined?parseFloat(skuRate.mai):def;
     var rJun=rMai; // Jun e Jul herdam taxa de Mai (campo único)
