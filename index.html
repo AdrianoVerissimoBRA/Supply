@@ -247,6 +247,7 @@ function getForroEntry(modelo, cor) {
 }
 // Mapa de cor real de compra por tecido (ignora cor do modelo, usa cor do tecido)
 // Adicionar aqui tecidos que so existem em uma cor especifica
+const PRODUCT_WHITELIST = {"BRA 001||AMARELO":1,"BRA 002||PRETO":1,"ALISON||BRANCO":1,"ALISON||PRETO":1,"KATY||PRETO":1,"SABRINA||PRETO":1,"SABRINA||OFF WHITE":1,"DUNA||JEANS":1,"AMANDA||MARROM":1,"AMANDA||PRETO":1,"SELENA||LISTRADA":1,"CELENA||LISTRADA":1,"CHARLY||PRETO":1,"CLÉO||PRETO":1,"CLEO||PRETO":1,"MATILDA||PRETO":1,"MATILDA||VERMELHO":1,"TEDDY||OFF WHITE":1,"TEDDY||JEANS":1,"TEDDY||VERMELHO":1,"TEDDY||VERMELHA":1,"TEDDY||MARROM":1,"LANA||AMARELO":1,"LANA||PRETO":1,"SOFIA||PRETO":1,"BONNIE||PRETO":1,"STAR||PRETO":1,"LUCY||CINZA":1,"LUCY||PRETO":1,"PIETRA||PRETO":1,"MIA||BRANCO":1,"MIA||PRETO":1,"OFÉLIA||BRANCO":1,"OFELIA||BRANCO":1,"OFÉLIA||PRETO":1,"OFELIA||PRETO":1,"PÉROLA||BRANCO":1,"PEROLA||BRANCO":1,"PÉROLA||PRETO":1,"PEROLA||PRETO":1,"MIRANDA||ONÇA":1,"MAITÊ||PRETO":1,"MAITE||PRETO":1,"LIA||PRETO":1,"GABRIELA||PRETO":1,"OLGA||PRETO":1,"ALICIA||PRETO":1,"BELLA||PRETO":1};
 const FABRIC_FORCE_COR = {
   "eclipse blue black": "Blue Black",
   "eclipse": "Blue Black"
@@ -413,9 +414,12 @@ function useLastSession() {
     // Não excluir modelo+cor que existe explicitamente no CATALOG_COLOR (cor definida na planilha)
     var exSet=window._excludedMC;
     window._isExcluded=function(modelo,cor){
-      if(!window._filterEnabled) return false;
-      return exSet.hasOwnProperty((modelo||'').toUpperCase()+'||'+(cor||'').toLowerCase());
-    };
+    if(!window._filterEnabled) return false;
+    var _m=(modelo||'').toUpperCase(), _c=(cor||'').toUpperCase();
+    if(!PRODUCT_WHITELIST[_m+'||'+_c]) return true;
+    var mc=_m+'||'+_c.toLowerCase();
+    return exSet.hasOwnProperty(mc);
+  };
     // Recalc summary with filter
     var monthlyTots={};
     rawSales.forEach(function(r){
@@ -1030,8 +1034,9 @@ function calculateAll(){
 var exSet=window._excludedMC;
   window._isExcluded=function(modelo,cor){
     if(!window._filterEnabled) return false;
-    var mc=(modelo||'').toUpperCase()+'||'+(cor||'').toLowerCase();
-    return exSet.hasOwnProperty(mc);
+    var _m=(modelo||'').toUpperCase(), _c=(cor||'').toUpperCase();
+    if(!PRODUCT_WHITELIST[_m+'||'+_c]) return true;
+    return exSet.hasOwnProperty(_m+'||'+_c.toLowerCase());
   };
 
   var monthlyTots={};
@@ -1071,7 +1076,11 @@ function rebuildProj(){
     var exSet=window._excludedMC;
     window._isExcluded=function(modelo,cor){
       if(!window._filterEnabled) return false;
-      return exSet.hasOwnProperty((modelo||'').toUpperCase()+'||'+(cor||'').toLowerCase());
+      var _m=(modelo||'').toUpperCase(), _c=(cor||'').toUpperCase();
+      // Whitelist: only these modelo+cor are allowed
+      var _wk=_m+'||'+_c;
+      if(!PRODUCT_WHITELIST[_wk]) return true;
+      return exSet.hasOwnProperty(_m+'||'+(_c.toLowerCase()));
     };
   }
 
