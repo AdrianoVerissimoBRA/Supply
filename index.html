@@ -196,6 +196,9 @@ tfoot td{background:var(--bg3);font-weight:700;border-top:2px solid var(--border
       <button class="btn-sm" onclick="document.getElementById('app').style.display='none';document.getElementById('upload-screen').style.display='flex'">
         &#8593; Atualizar Planilhas
       </button>
+      <button class="btn-sm" onclick="exportConfigHtml()" style="background:#e0fce8;border-color:#16a34a;color:#15803d;font-weight:700">
+        &#128190; Salvar Configurações
+      </button>
     </div>
     </div>
   <div class="tab-bar">
@@ -327,6 +330,41 @@ function sortTbl(tid, col) {
 }
 
 // ── SESSION ───────────────────────────────────────────────────────────────
+
+function exportConfigHtml(){
+  try{
+    // Collect current rates
+    var rates=window._prodRates||{};
+    var ratesJson=JSON.stringify(rates);
+    
+    // Read current HTML source
+    var src=document.documentElement.outerHTML;
+    
+    // Replace the prodRates inside PRELOADED_SESSION with current values
+    // Match: "prodRates":{...} inside the PRELOADED_SESSION variable
+    src=src.replace(/("prodRates"\s*:\s*)\{[^}]*\}(?=[,}])/g,
+                    function(m,p){ return p+ratesJson; });
+    
+    // Also update the ts so this version is considered newer
+    var newTs=Date.now();
+    src=src.replace(/"ts":\s*\d+/, '"ts": '+newTs);
+    
+    // Create download
+    var blob=new Blob([src],{type:'text/html;charset=utf-8'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;
+    a.download='pangeia96_supply_configurado.html';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){URL.revokeObjectURL(url);document.body.removeChild(a);},1000);
+    
+    var count=Object.keys(rates).length;
+    alert('✅ Arquivo salvo com '+count+' configurações de taxa!\nAbra o arquivo baixado em qualquer computador — as configurações estarão preservadas.');
+  }catch(e){
+    alert('Erro ao exportar: '+e.message);
+  }
+}
 function saveSession() {
   try {
     var hist={};
