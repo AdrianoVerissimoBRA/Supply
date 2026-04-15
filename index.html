@@ -1898,7 +1898,7 @@ function renderPecasSection(){
     if(p.disp<0){totDef+=Math.abs(p.disp);negCount++;}
     if(p.disp>0){posCount++;posTotal+=p.disp;}
   });
-  var xlP=[['Modelo','Cor','Est.Disponivel','Em Corte','Em Costura','Total WIP','Deficit Mai','Proj Mai','Proj Jun','Proj Jul','Nec.Liq 3M','Status']];
+  var xlP=[['Modelo','Cor','Est.Disponivel','Em Corte','Em Costura','Total WIP','Saldo Atual','Deficit Mai','Proj Mai','Proj Jun','Proj Jul','Nec.Liq 3M','Status']];
   var rows=entries.map(function(p,i){
     var bg=i%2?'background:#f9f4ff':'';
     var dc=p.disp<0?'#b91c1c':'#166534';
@@ -1910,7 +1910,7 @@ function renderPecasSection(){
     else if(p.disp<0){stTxt='NEGATIVO';stBg='background:#fff7ed;color:#c2410c;font-weight:600;border:1px solid #fed7aa';}
     else if(p.mai&&p.disp<p.mai){stTxt='ATENCAO';stBg='background:#fefce8;color:#a16207;border:1px solid #fde68a';}
     else{stTxt='OK';stBg='background:#f0fdf4;color:#166534;border:1px solid #bbf7d0';}
-    xlP.push([p.modelo,p.cor,p.disp,p.corte,p.costura,wt,p.deficit_mai,p.mai,p.jun,p.jul,p.mai+p.jun+p.jul,stTxt]);
+    xlP.push([p.modelo,p.cor,p.disp,p.corte,p.costura,wt,p.disp+wt,p.deficit_mai,p.mai,p.jun,p.jul,p.mai+p.jun+p.jul,stTxt]);
     var need3m=(p.mai||0)+(p.jun||0)+(p.jul||0)-(p.disp||0)-(wt||0);
     var need3mClr=need3m>0?'#b91c1c':'#166534';
     return '<tr style="'+bg+'">'
@@ -1920,6 +1920,7 @@ function renderPecasSection(){
       +'<td class="num" style="color:#7c3aed">'+(p.corte?fmtN(p.corte):'--')+'</td>'
       +'<td class="num" style="color:#0284c7">'+(p.costura?fmtN(p.costura):'--')+'</td>'
       +'<td class="num bold">'+(wt?fmtN(wt):'--')+'</td>'
+      +'<td class="num bold" style="color:'+(p.disp+wt>=0?'#166534':'#b91c1c')+';background:#fffbeb">'+fmtN(p.disp+wt)+'</td>'
       +'<td class="num" style="'+defSt+'">'+defVal+'</td>'
       +'<td class="num" style="color:#0ea86e;font-weight:600">'+(p.mai?fmtN(p.mai):'--')+'</td>'
       +'<td class="num" style="color:#0ea86e">'+(p.jun?fmtN(p.jun):'--')+'</td>'
@@ -1948,12 +1949,13 @@ function renderPecasSection(){
     +'<th onclick="sortTbl(&#39;tbl-pecas&#39;,3)" style="color:#7c3aed">Em Corte</th>'
     +'<th onclick="sortTbl(&#39;tbl-pecas&#39;,4)" style="color:#0284c7">Em Costura</th>'
     +'<th onclick="sortTbl(&#39;tbl-pecas&#39;,5)">Total WIP</th>'
-    +'<th onclick="sortTbl(&#39;tbl-pecas&#39;,6)" style="background:#fef2f2;color:#b91c1c">Deficit Mai</th>'
-    +'<th onclick="sortTbl(&#39;tbl-pecas&#39;,7)" style="background:#f0fdf4">Proj Mai</th>'
-    +'<th onclick="sortTbl(&#39;tbl-pecas&#39;,8)" style="background:#f0fdf4">Proj Jun</th>'
-    +'<th onclick="sortTbl(&#39;tbl-pecas&#39;,9)" style="background:#f0fdf4">Proj Jul</th>'
-    +'<th onclick="sortTbl(&#39;tbl-pecas&#39;,10)" style="background:#f3e8ff;color:#5c1e96">Nec. Liq 3M</th>'
-    +'<th onclick="sortTbl(&#39;tbl-pecas&#39;,11)">Status</th>'
+    +'<th onclick="sortTbl(&#39;tbl-pecas&#39;,6)" style="background:#fffbeb;color:#92400e;font-weight:700">Saldo Atual</th>'
+    +'<th onclick="sortTbl(&#39;tbl-pecas&#39;,7)" style="background:#fef2f2;color:#b91c1c">Deficit Mai</th>'
+    +'<th onclick="sortTbl(&#39;tbl-pecas&#39;,8)" style="background:#f0fdf4">Proj Mai</th>'
+    +'<th onclick="sortTbl(&#39;tbl-pecas&#39;,9)" style="background:#f0fdf4">Proj Jun</th>'
+    +'<th onclick="sortTbl(&#39;tbl-pecas&#39;,10)" style="background:#f0fdf4">Proj Jul</th>'
+    +'<th onclick="sortTbl(&#39;tbl-pecas&#39;,11)" style="background:#f3e8ff;color:#5c1e96">Nec. Liq 3M</th>'
+    +'<th onclick="sortTbl(&#39;tbl-pecas&#39;,12)">Status</th>'
     +'</tr></thead><tbody>'+rows+'</tbody></table></div></div>'
     +'<div style="border-top:3px solid #5C1E96;margin:20px 20px 0;padding-top:15px"></div>';
 }
