@@ -1809,9 +1809,20 @@ function buildPecasView(){
     if(low.indexOf('brinde')>=0||low.indexOf('surpresa')>=0||low.indexOf(' png')>=0||low.indexOf('malha ')>=0||low.indexOf('tule ')>=0||low.indexOf('etiqueta')>=0||low.indexOf('elastic')>=0||low.indexOf('colchete')>=0||low.indexOf('corte ')>=0||low.indexOf('adesivo')>=0||low.indexOf('acessorio')>=0||low.indexOf('acessório')>=0||low.indexOf('bloquinho')>=0||low.indexOf('chaveiro')>=0||low.indexOf('copo ')>=0||low.indexOf('ecobag')>=0||low.indexOf('dream')>=0||low.indexOf('look ')>=0||low.indexOf('mystery')>=0||low.indexOf('oculos')>=0||low.indexOf('óculos')>=0||low.indexOf('pacote')>=0||low.indexOf('pan pan')>=0||low.indexOf('observa')>=0||low==='m'||low.indexOf('black card')>=0||low.indexOf('aula ')>=0||low.indexOf('pedido antigo')>=0||low.indexOf('todos ')>=0||low.indexOf('energy')>=0||low.indexOf('jeans ')===0||low.indexOf('mala ')===0) return;
     var parts=prod.split(' - ');
     if(parts.length<3) return;
-    var modelo=parts[1].trim().toUpperCase();
     var firstW=parts[0].trim().split(' ');
-    var cor=firstW.slice(1).join(' ');
+    var cor=firstW.slice(1).join(' ').replace(/\t/g,'').trim();
+    var modelo=parts[parts.length-2].trim().toUpperCase();
+    // Detect inversion: modelo is a color word, cor is the real model name
+    var _COLORWORDS={'PRETO':1,'PRETA':1,'BRANCO':1,'BRANCA':1,'VERMELHO':1,'VERMELHA':1,
+                     'AMARELO':1,'AMARELA':1,'MARROM':1,'VERDE':1,'AZUL':1,'ROSA':1,
+                     'CINZA':1,'ROXO':1,'ROXA':1,'NUDE':1,'BEGE':1,'CORAL':1,
+                     'DOURADO':1,'DOURADA':1,'JEANS':1,'ESTAMPADO':1,'LISTRADO':1,'CARAMELO':1};
+    if(_COLORWORDS[modelo] && cor && !_COLORWORDS[cor.toUpperCase()]){
+      // Swap: modelo is the color, cor is the model
+      var _tmp=modelo;
+      modelo=cor.toUpperCase();
+      cor=_tmp.charAt(0).toUpperCase()+_tmp.slice(1).toLowerCase();
+    }
     if(!modelo||modelo.length<2) return;
     var nc=normC(cor);
     var key=makeKey(modelo,cor);
