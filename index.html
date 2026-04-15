@@ -1162,11 +1162,22 @@ function buildFabricNeeds(){
     if(r.mes==='2026-03') histFab[t].mar+=r.qty*fab.consumo;
     if(r.mes==='2026-04') histFab[t].apr+=r.qty*fab.consumo;
   });
+  // Pré-computa total 3M por modelo+cor para filtro < 1000 pcs
+  var _modelCorTot3M={};
+  ['2026-05','2026-06','2026-07'].forEach(function(mes){
+    (projData[mes]||[]).forEach(function(r){
+      var _mc=(r.modelo||'').toUpperCase()+'||'+(normalizeCor(r.cor||'').toUpperCase());
+      _modelCorTot3M[_mc]=(_modelCorTot3M[_mc]||0)+(r.qty||0);
+    });
+  });
   fabricNeeds={};
   ['2026-05','2026-06','2026-07'].forEach(function(mes){
     projData[mes].forEach(function(r){
       if(!r.tecido||r.tecido==='N/M') return;
       if(_isTricot(r.tecido)) return;
+      // Filtro: modelo+cor com total 3M < 1000 peças não entra na sugestão de compra
+      var _mc=(r.modelo||'').toUpperCase()+'||'+(normalizeCor(r.cor||'').toUpperCase());
+      if((_modelCorTot3M[_mc]||0)<1000) return;
       var cor=normalizeCor(r.cor||'').toUpperCase();
       // Sobrescreve com cor real do tecido se mapeado (ex: Vitta Light so existe em Preto)
       var _tecLow=r.tecido.toLowerCase();
@@ -2102,9 +2113,7 @@ function renderCompra(){
     window._wipKeys[i]=e[0]; window._compraKeys[i]=e[0];
     var t=e[1];
     if(t.tecido.toLowerCase()==='igor black') return;
-    // Filtro: total projetado 3M em peças < 500 → não entra na sugestão de compra
-    var tot3mPcs=(t.mai_pcs||0)+(t.jun_pcs||0)+(t.jul_pcs||0);
-    if(!t._orphan && tot3mPcs>0 && tot3mPcs<500) return;
+    // Filtro aplicado em buildFabricNeeds (modelo+cor < 1000 pcs/3M)
     if(t._isForro) tecsForro.push([e,i]);
     else if(_isCalca(t)) tecsJeans.push([e,i]);
     else tecsDiversos.push([e,i]);
