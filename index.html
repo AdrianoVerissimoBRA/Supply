@@ -1557,6 +1557,15 @@ function renderProjData(){
     if(r.mes==='2026-03') histCats[r.categoria].mar+=r.qty;
     if(r.mes==='2026-04') histCats[r.categoria].apr+=r.qty;
   });
+  // Scale jan/fev/mar per category to match stored summary totals
+  var rawJ=0,rawF=0,rawM=0;
+  Object.values(histCats).forEach(function(c){rawJ+=c.jan;rawF+=c.fev;rawM+=c.mar;});
+  var scJ=rawJ>0&&s.jan?s.jan/rawJ:1, scF=rawF>0&&s.fev?s.fev/rawF:1, scM=rawM>0&&s.mar?s.mar/rawM:1;
+  Object.values(histCats).forEach(function(c){
+    c.jan=Math.round(c.jan*scJ);
+    c.fev=Math.round(c.fev*scF);
+    c.mar=Math.round(c.mar*scM);
+  });
   var hTot={jan:0,fev:0,mar:0,apr:0};
   Object.values(histCats).forEach(function(c){hTot.jan+=c.jan;hTot.fev+=c.fev;hTot.mar+=c.mar;hTot.apr+=c.apr;});
   var projCats={};
@@ -2167,6 +2176,23 @@ function renderHist(){
     if(!r.mes||!r.categoria) return;
     if(!cats[r.categoria]) cats[r.categoria]={};
     cats[r.categoria][r.mes]=(cats[r.categoria][r.mes]||0)+r.qty;
+  });
+  // Scale category totals to match stored summary (reconcile data sources)
+  var rawTots={'2026-01':0,'2026-02':0,'2026-03':0};
+  Object.values(cats).forEach(function(m){
+    rawTots['2026-01']+=(m['2026-01']||0);
+    rawTots['2026-02']+=(m['2026-02']||0);
+    rawTots['2026-03']+=(m['2026-03']||0);
+  });
+  var scale={
+    '2026-01': rawTots['2026-01']>0&&s.jan ? s.jan/rawTots['2026-01'] : 1,
+    '2026-02': rawTots['2026-02']>0&&s.fev ? s.fev/rawTots['2026-02'] : 1,
+    '2026-03': rawTots['2026-03']>0&&s.mar ? s.mar/rawTots['2026-03'] : 1
+  };
+  Object.keys(cats).forEach(function(cat){
+    ['2026-01','2026-02','2026-03'].forEach(function(mes){
+      if(cats[cat][mes]) cats[cat][mes]=Math.round(cats[cat][mes]*scale[mes]);
+    });
   });
   var xlHist=[['Categoria','Jan/26','Fev/26','Mar/26','Abr(15d)','AbrProj','Tend.']];
   var rows=Object.entries(cats).sort(function(a,b){return (b[1]['2026-03']||0)-(a[1]['2026-03']||0);}).map(function(e,i){
