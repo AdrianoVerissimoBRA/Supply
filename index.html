@@ -1130,8 +1130,8 @@ function rebuildProj(){
     var aprBase=Math.round(sku.qty*(30/APR_DAYS));
     var skuRate=pr[pk]||{};
     var rMai=skuRate.mai!==undefined?parseFloat(skuRate.mai):def;
-    var rJun=skuRate.jun!==undefined?parseFloat(skuRate.jun):def;
-    var rJul=skuRate.jul!==undefined?parseFloat(skuRate.jul):def;
+    var rJun=rMai; // Jun e Jul herdam taxa de Mai (campo único)
+    var rJul=rMai;
 
     var qMai=Math.max(0,Math.round(aprBase*(1+rMai/100)));
     var qJun=Math.max(0,Math.round(qMai*(1+rJun/100)));
@@ -1475,13 +1475,15 @@ function _applyProdRateSmart(){
   if(!pk) return;
   if(!window._prodRates[pk]) window._prodRates[pk]={};
 
-  // Read ALL visible input values (not just changed one) to stay in sync
+  // Read ONLY Mai input; Jun and Jul inherit same rate
   (window._prodKeys||[]).forEach(function(key,i){
     if(!window._prodRates[key]) window._prodRates[key]={};
-    ['mai','jun','jul'].forEach(function(m){
-      var el=document.getElementById('pr_'+m+'_'+i);
-      if(el){var v=parseFloat(el.value); if(!isNaN(v)) window._prodRates[key][m]=v;}
-    });
+    var el=document.getElementById('pr_mai_'+i);
+    if(el){var v=parseFloat(el.value); if(!isNaN(v)){
+      window._prodRates[key].mai=v;
+      window._prodRates[key].jun=v;
+      window._prodRates[key].jul=v;
+    }}
   });
 
   // Save focus state
@@ -1844,8 +1846,8 @@ function renderProjData(){
     window._prodKeys.push(pk);
     var pr=window._prodRates&&window._prodRates[pk];
     var rMai=pr&&pr.mai!==undefined?parseFloat(pr.mai):parseFloat(cr['mai_'+p.cat]!==undefined?cr['mai_'+p.cat]:def);
-    var rJun=pr&&pr.jun!==undefined?parseFloat(pr.jun):parseFloat(cr['jun_'+p.cat]!==undefined?cr['jun_'+p.cat]:def);
-    var rJul=pr&&pr.jul!==undefined?parseFloat(pr.jul):parseFloat(cr['jul_'+p.cat]!==undefined?cr['jul_'+p.cat]:def);
+    var rJun=rMai; // Jun e Jul herdam a mesma taxa de Mai (um campo único)
+    var rJul=rMai;
     var aprP=Math.round(p.apr*(30/(s.APR_DAYS||15))), t3=p.mai+p.jun+p.jul;
     tJan+=p.jan;tFev+=p.fev;tMar+=p.mar;tApr+=p.apr;tAprP+=aprP;tMai+=p.mai;tJun+=p.jun;tJul+=p.jul;tT3+=t3;
     xlProd.push([p.modelo,p.cat,p.cor,p.tamanho,p.tecido,p.jan,p.fev,p.mar,p.apr,aprP,rMai,p.mai,rJun,p.jun,rJul,p.jul,t3]);
@@ -1862,9 +1864,9 @@ function renderProjData(){
       +'<td class="num" style="color:#d97706;font-weight:600">'+(aprP||'-')+'</td>'
       +'<td class="num" style="padding:2px">'+mkI('mai',rMai)+'</td>'
       +'<td class="num" style="color:#0ea86e;font-weight:600">'+(p.mai||'-')+'</td>'
-      +'<td class="num" style="padding:2px">'+mkI('jun',rJun)+'</td>'
+      +'<td class="num" style="color:#bbb;font-size:11px">'+rMai.toFixed(0)+'%</td>'
       +'<td class="num" style="color:#0ea86e;font-weight:600">'+(p.jun||'-')+'</td>'
-      +'<td class="num" style="padding:2px">'+mkI('jul',rJul)+'</td>'
+      +'<td class="num" style="color:#bbb;font-size:11px">'+rMai.toFixed(0)+'%</td>'
       +'<td class="num" style="color:#0ea86e;font-weight:600">'+(p.jul||'-')+'</td>'
       +'<td class="num bold">'+(fmtN(t3)||'-')+'</td></tr>';
   }).join('');
@@ -1908,11 +1910,11 @@ function renderProjData(){
     +'<th onclick="sortTbl(&#39;tbl-proj-prod&#39;,7)" style="background:#e8e8f0">Mar</th>'
     +'<th style="background:#fef9ec">'+s.APR_DAYS+'d</th>'
     +'<th onclick="sortTbl(&#39;tbl-proj-prod&#39;,9)" style="background:#fef9ec">Proj</th>'
-    +'<th style="background:#f0fdf4;font-size:10px;color:#5c1e96">%Mai</th>'
+    +'<th style="background:#f0fdf4;font-size:10px;color:#5c1e96" title="Taxa aplicada para Mai/Jun/Jul">% Cresc.</th>'
     +'<th onclick="sortTbl(&#39;tbl-proj-prod&#39;,11)" style="background:#f0fdf4">Mai</th>'
-    +'<th style="background:#f0fdf4;font-size:10px;color:#5c1e96">%Jun</th>'
+    +'<th style="background:#f3f3f3;font-size:10px;color:#bbb">Jun%</th>'
     +'<th onclick="sortTbl(&#39;tbl-proj-prod&#39;,13)" style="background:#f0fdf4">Jun</th>'
-    +'<th style="background:#f0fdf4;font-size:10px;color:#5c1e96">%Jul</th>'
+    +'<th style="background:#f3f3f3;font-size:10px;color:#bbb">Jul%</th>'
     +'<th onclick="sortTbl(&#39;tbl-proj-prod&#39;,15)" style="background:#f0fdf4">Jul</th>'
     +'</tr></thead><tbody>'+prodRows+'</tbody><tfoot>'+prodFoot+'</tfoot></table></div>';
 }
