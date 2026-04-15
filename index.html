@@ -197,7 +197,7 @@ tfoot td{background:var(--bg3);font-weight:700;border-top:2px solid var(--border
         &#8593; Atualizar Planilhas
       </button>
       <button class="btn-sm" onclick="exportConfigHtml()" style="background:#e0fce8;border-color:#16a34a;color:#15803d;font-weight:700">
-        &#128190; Salvar Configurações
+        &#128203; Copiar para GitHub
       </button>
     </div>
     </div>
@@ -333,38 +333,23 @@ function sortTbl(tid, col) {
 
 function exportConfigHtml(){
   try{
-    // Collect current rates
     var rates=window._prodRates||{};
     var ratesJson=JSON.stringify(rates);
-    
-    // Read current HTML source
     var src=document.documentElement.outerHTML;
-    
-    // Replace the prodRates inside PRELOADED_SESSION with current values
-    // Match: "prodRates":{...} inside the PRELOADED_SESSION variable
     src=src.replace(/("prodRates"\s*:\s*)\{[^}]*\}(?=[,}])/g,
-                    function(m,p){ return p+ratesJson; });
-    
-    // Also update the ts so this version is considered newer
-    var newTs=Date.now();
-    src=src.replace(/"ts":\s*\d+/, '"ts": '+newTs);
-    
-    // Create download
+                    function(m,p){return p+ratesJson;});
+    src=src.replace(/"ts":\s*\d+/,'"ts": '+Date.now());
     var blob=new Blob([src],{type:'text/html;charset=utf-8'});
     var url=URL.createObjectURL(blob);
     var a=document.createElement('a');
-    a.href=url;
-    a.download='pangeia96_supply_configurado.html';
-    document.body.appendChild(a);
-    a.click();
+    a.href=url; a.download='index.html';
+    document.body.appendChild(a); a.click();
     setTimeout(function(){URL.revokeObjectURL(url);document.body.removeChild(a);},1000);
-    
     var count=Object.keys(rates).length;
-    alert('✅ Arquivo salvo com '+count+' configurações de taxa!\nAbra o arquivo baixado em qualquer computador — as configurações estarão preservadas.');
-  }catch(e){
-    alert('Erro ao exportar: '+e.message);
-  }
+    alert('index.html baixado com '+count+' taxas embutidas.\n\nGitHub:\n1. Abra o repositório\n2. Clique em index.html → Edit (lápis)\n3. Selecione tudo (Ctrl+A) e delete\n4. Cole o conteúdo do arquivo baixado\n5. Commit changes');
+  }catch(e){alert('Erro: '+e.message);}
 }
+
 function saveSession() {
   try {
     var hist={};
@@ -2115,9 +2100,13 @@ function renderCompra(){
   window._wipKeys={}; window._compraKeys={};
   tecs.forEach(function(e,i){
     window._wipKeys[i]=e[0]; window._compraKeys[i]=e[0];
-    if(e[1].tecido.toLowerCase()==='igor black') return;
-    if(e[1]._isForro) tecsForro.push([e,i]);
-    else if(_isCalca(e[1])) tecsJeans.push([e,i]);
+    var t=e[1];
+    if(t.tecido.toLowerCase()==='igor black') return;
+    // Filtro: total projetado 3M em peças < 500 → não entra na sugestão de compra
+    var tot3mPcs=(t.mai_pcs||0)+(t.jun_pcs||0)+(t.jul_pcs||0);
+    if(!t._orphan && tot3mPcs>0 && tot3mPcs<500) return;
+    if(t._isForro) tecsForro.push([e,i]);
+    else if(_isCalca(t)) tecsJeans.push([e,i]);
     else tecsDiversos.push([e,i]);
   });
 
