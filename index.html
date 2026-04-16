@@ -239,6 +239,8 @@ function _undCompra(tec){
   return _rendimento(tec)>1?"KG":"MT";
 }
 const BLOCKED_CATS={'Jaqueta':1,'Camisa':1,'Conjunto':1,'Jardineira':1,'Macacão':1,'Macaquito':1,'Short':1};
+
+const CATALOG_COLOR = {"ALISON||PRETO": {"tecido": "Vitta Light", "consumo": 0.311, "und": "KG", "und_compra": "KG"}, "ALISON||BRANCO": {"tecido": "Micro Jersey", "consumo": 0.311, "und": "KG", "und_compra": "KG"}};
 const FABRIC_FORCE_COR = {
   "vitta light": "Preto"
   // Exemplo para adicionar mais: "nome do tecido em lowercase": "Cor"
@@ -742,6 +744,73 @@ function pChip(val,base){
 
 
 var _compraKeys={};
+
+function _compraDetailClick(idx){
+  var key=window._compraKeys&&window._compraKeys[idx]; if(!key) return;
+  var parts=key.split('||'); var tecido=parts[0], cor=parts[1]||'', und=parts[2]||'KG';
+  var rend=typeof _rendimento==='function'?_rendimento(tecido):1;
+  // Collect projData entries for this tecido
+  var rows=[];
+  ['2026-05','2026-06','2026-07'].forEach(function(mes){
+    (projData[mes]||[]).forEach(function(r){
+      if((r.tecido||'').toUpperCase()!==tecido.toUpperCase()) return;
+      var rowCor=(r.cor||'').toUpperCase();
+      if(cor&&rowCor!==cor.toUpperCase()) return;
+      var isCalca=/(cal[çc]a|calca)/i.test(r.categoria||'');
+      var fabUnd=(r.und||'MT').toUpperCase();
+      var rend=_rendimento(tecido)||1;
+      // consumo pode ser em KG ou MT dependendo do tecido
+      var consKg, consMt;
+      if(fabUnd==='KG'){
+        consKg=r.consumo; // já em KG/pç
+        consMt=round1(r.consumo*rend); // converte para MT
+      } else {
+        consMt=r.consumo; // já em MT/pç
+        consKg=rend>1?round1(r.consumo/rend):r.consumo; // converte para KG
+      }
+      rows.push({modelo:r.modelo,cor:r.cor,tam:r.tamanho,mes:mes,qty:r.qty||0,
+        mt:round1((r.qty||0)*consMt), kg:round1((r.qty||0)*consKg)});
+    });
+  });
+  // Group by modelo+cor+tam, sum across months
+  var grp={};
+  rows.forEach(function(r){
+    var k=r.modelo+'|'+r.cor+'|'+r.tam;
+    if(!grp[k]) grp[k]={modelo:r.modelo,cor:r.cor,tam:r.tam,qty:0,mt:0,kg:0};
+    grp[k].qty+=r.qty; grp[k].mt+=r.mt; grp[k].kg+=r.kg;
+  });
+  var items=Object.values(grp).sort(function(a,b){return b.kg-a.kg;});
+  var totalQty=items.reduce(function(s,r){return s+r.qty;},0);
+  var totalMt=items.reduce(function(s,r){return s+r.mt;},0);
+  var totalKg=items.reduce(function(s,r){return s+r.kg;},0);
+  var html='<div style="margin-bottom:8px;font-size:13px;color:#5c1e96;font-weight:700">'+tecido+' '+cor+' — Projeção Mai+Jun+Jul</div>';
+  html+='<div style="font-size:11px;color:#888;margin-bottom:10px">Rendimento: '+rend+' MT/KG | Unidade de compra: '+und+'</div>';
+  html+='<table style="width:100%;border-collapse:collapse;font-size:12px">'
+    +'<thead><tr style="background:#f3ecff"><th style="text-align:left;padding:4px 8px">Produto</th>'
+    +'<th style="text-align:left;padding:4px 8px">Cor</th>'
+    +'<th style="text-align:left;padding:4px 8px">Tam</th>'
+    +'<th style="text-align:right;padding:4px 8px">Pcs</th>'
+    +'<th style="text-align:right;padding:4px 8px">MT</th>'
+    +'<th style="text-align:right;padding:4px 8px">KG</th></tr></thead><tbody>';
+  items.forEach(function(r,i){
+    var bg=i%2?'background:#f9f4ff':'';
+    html+='<tr style="'+bg+'"><td style="padding:4px 8px;font-weight:600">'+r.modelo+'</td>'
+      +'<td style="padding:4px 8px">'+r.cor+'</td>'
+      +'<td style="padding:4px 8px;font-family:monospace">'+r.tam+'</td>'
+      +'<td style="padding:4px 8px;text-align:right">'+r.qty+'</td>'
+      +'<td style="padding:4px 8px;text-align:right">'+fmtD(r.mt,1)+' MT</td>'
+      +'<td style="padding:4px 8px;text-align:right;color:#7c3aed;font-weight:700">'+fmtD(r.kg,1)+' KG</td></tr>';
+  });
+  html+='<tr style="background:#f0fdf4;font-weight:700;border-top:2px solid #16a34a">'
+    +'<td colspan="3" style="padding:4px 8px">TOTAL</td>'
+    +'<td style="padding:4px 8px;text-align:right">'+totalQty+'</td>'
+    +'<td style="padding:4px 8px;text-align:right">'+fmtD(totalMt,1)+' MT</td>'
+    +'<td style="padding:4px 8px;text-align:right;color:#16a34a">'+fmtD(totalKg,1)+' KG</td></tr>';
+  html+='</tbody></table>';
+  document.getElementById('wip-modal-body').innerHTML=html;
+  document.getElementById('wip-modal').style.display='flex';
+}
+
 function _compraClick(idx){
   var key=_compraKeys&&_compraKeys[idx]; if(!key) return;
   var fn=fabricNeeds[key]; if(!fn) return;
@@ -1038,7 +1107,7 @@ function rebuildProj(){
     var qJun=aprBase;
     var qJul=aprBase;
 
-    var fab=CATALOG[sku.modelo]||{};
+    var fab=_getCatalog(sku.modelo,sku.cor);
     var base={modelo:sku.modelo,cor:sku.cor,tamanho:sku.tamanho,categoria:sku.categoria,
               tecido:fab.tecido||'N/M',consumo:fab.consumo||0,und:fab.und||'MT',
               _grpAvg:sku._grpAvg,_grpPct:sku._grpPct,_target:sku._target,_sizePct:sku._sizePct};
@@ -1059,12 +1128,16 @@ function rebuildProj(){
   window._summary.julTot=projData['2026-07'].reduce(function(a,r){return a+r.qty;},0);
 }
 
+function _getCatalog(modelo,cor){
+  var key=(modelo||"").toUpperCase()+"||"+(cor||"").toUpperCase();
+  return CATALOG_COLOR[key]||CATALOG[(modelo||"").toUpperCase()]||CATALOG[modelo]||{};
+}
 function buildFabricNeeds(){
   function _isTricot(t){var l=(t||'').toLowerCase();return l.indexOf('tricot')>=0||l.indexOf('fio tricot')>=0;}
   var histFab={};
   rawSales.forEach(function(r){
     if(!r.mes||!r.modelo) return;
-    var fab=CATALOG[r.modelo]; if(!fab||!fab.tecido||fab.tecido==='N/M'||!fab.consumo) return;
+    var fab=_getCatalog(r.modelo,r.cor); if(!fab||!fab.tecido||fab.tecido==='N/M'||!fab.consumo) return;
     if(_isTricot(fab.tecido)) return;
     var t=fab.tecido;
     if(!histFab[t]) histFab[t]={und:fab.und,jan:0,fev:0,mar:0,apr:0};
@@ -1247,6 +1320,8 @@ function buildFabricNeeds(){
     var rawLiq=round1(total-wip-compras-estoque);
     t.liq=Math.max(0,rawLiq);
     t.sobra=rawLiq<0?round1(Math.abs(rawLiq)):0;
+    var rawLiqSW=round1(total-compras-estoque); // sem WIP
+    t.liqSemWip=Math.max(0,rawLiqSW);
     t.prods=[...t.prods].join(', ');
     t.mai=round1(t.mai); t.jun=round1(t.jun); t.jul=round1(t.jul);
     var tvol=tecVolMap[t.tecido]||1;
@@ -1553,7 +1628,7 @@ function renderProjData(){
   rawSales.forEach(function(r){
     if(window._isExcluded&&window._isExcluded(r.modelo,r.cor,r.categoria)) return;
     var k=r.modelo+'|'+r.cor+'|'+r.tamanho;
-    if(!prodMap[k]) prodMap[k]={modelo:r.modelo,cor:r.cor,tamanho:r.tamanho,cat:r.categoria,tecido:(CATALOG[r.modelo]||{}).tecido||'',jan:0,fev:0,mar:0,apr:0,mai:0,jun:0,jul:0};
+    if(!prodMap[k]) prodMap[k]={modelo:r.modelo,cor:r.cor,tamanho:r.tamanho,cat:r.categoria,tecido:(_getCatalog(r.modelo,r.cor).tecido||''),jan:0,fev:0,mar:0,apr:0,mai:0,jun:0,jul:0};
     if(r.mes==='2026-01') prodMap[k].jan+=r.qty;
     if(r.mes==='2026-02') prodMap[k].fev+=r.qty;
     if(r.mes==='2026-03') prodMap[k].mar+=r.qty;
@@ -1825,11 +1900,11 @@ function renderCompra(){
   });
 
   function _calcTotals(arr){
-    var t={mai:0,jun:0,jul:0,liq:0,liqMT:0,liqKG:0,jan:0,fev:0,mar:0,aprP:0,total:0,wip:0,compra:0,estoque:0,comprarCount:0,orphanCount:0,sobra:0};
+    var t={mai:0,jun:0,jul:0,liq:0,liqSemWip:0,liqMT:0,liqKG:0,liqKGsw:0,jan:0,fev:0,mar:0,aprP:0,total:0,wip:0,compra:0,estoque:0,comprarCount:0,orphanCount:0,sobra:0};
     arr.forEach(function(item){
       var d=item[0][1], h=d.hist||{jan:0,fev:0,mar:0,apr:0};
-      t.mai+=d.mai;t.jun+=d.jun;t.jul+=d.jul;t.liq+=d.liq;
-      if(d.und==='MT')t.liqMT+=d.liq; else if(d.und==='KG')t.liqKG+=d.liq;
+      t.mai+=d.mai;t.jun+=d.jun;t.jul+=d.jul;t.liq+=d.liq;t.liqSemWip+=(d.liqSemWip||0);
+      if(d.und==='MT')t.liqMT+=d.liq; else if(d.und==='KG'){t.liqKG+=d.liq;t.liqKGsw+=(d.liqSemWip||0);}
       t.jan+=h.jan;t.fev+=h.fev;t.mar+=h.mar;t.aprP+=round1(h.apr*(30/(s.APR_DAYS||15)));
       t.total+=d.total;t.wip+=(d.wip||0);t.compra+=(d.compras||0);t.estoque+=(d.estoque||0);
       if(d.liq>0)t.comprarCount++;
@@ -1849,7 +1924,7 @@ function renderCompra(){
       var isOrphan=!!t._orphan;
       var sobra=t.sobra||0;
       var bg=isOrphan?'background:#fff8e1;border-left:3px solid #f59e0b':(groupIdx%2===0?'background:#f9f4ff':'background:#fff');
-      xlData.push([tec,cor||'-',t.und,h.jan,h.fev,h.mar,aprP,t.mai,t.jun,t.jul,t.total,t.wip,t.compras,t.estoque||0,t.und==='MT'?t.liq:0,t.und==='KG'?t.liq:0,sobra,t.liq>0?'COMPRAR':'COBERTO',t.prods]);
+      xlData.push([tec,cor||'-',t.und,h.jan,h.fev,h.mar,aprP,t.mai,t.jun,t.jul,t.total,t.wip,t.compras,t.estoque||0,t.und==='MT'?t.liq:0,t.und==='KG'?t.liq:0,t.und==='KG'?t.liqSemWip:0,sobra,t.liq>0?'COMPRAR':'COBERTO',t.prods]);
       return '<tr style="'+bg+'">'
         +'<td style="font-weight:600">'+tec+(isOrphan?' <span style="font-size:9px;background:#f59e0b;color:#fff;border-radius:4px;padding:1px 5px;vertical-align:middle">SEM DEMANDA</span>':'')+'</td>'
         +'<td>'+(isOrphan?'<span style="color:#f59e0b;font-size:10px;font-weight:700">⚠ Pedido órfão</span>':(cor?pill(cor,'#1e3a8a','#dbeafe'):'<span style="color:#bbb;font-size:10px">—</span>'))+'</td>'
@@ -1869,9 +1944,12 @@ function renderCompra(){
         +'<td class="num" style="color:#2563eb">'+(t.estoque>0?'-'+fmtD(t.estoque,1):'--')+'</td>'
         +'<td class="num bold" style="color:'+(t.und==='MT'&&t.liq>0?'#b91c1c':'#aaa')+'">'+(t.und==='MT'&&t.liq>0?fmtD(t.liq,1):'--')+'</td>'
         +'<td class="num bold" style="color:'+(t.und==='KG'&&t.liq>0?'#b91c1c':'#aaa')+'">'+(t.und==='KG'&&t.liq>0?fmtD(t.liq,1):'--')+'</td>'
+        +'<td class="num bold" style="color:'+(t.und==='KG'&&(t.liqSemWip||0)>0?'#7f1d1d':'#aaa')+';background:#fff8f8">'+(t.und==='KG'&&(t.liqSemWip||0)>0?fmtD(t.liqSemWip,1)+' KG':'--')+'</td>'
         +'<td class="num bold" style="color:'+(sobra>0?'#059669':'#aaa')+'">'+(sobra>0?fmtD(sobra,1)+' '+t.und:'--')+'</td>'
         +'<td>'+statusBadge(t.liq,t.total)+'</td>'
-        +'<td style="font-size:10px;color:#888;max-width:140px;white-space:normal">'+t.prods+'</td>'
+        +'<td style="font-size:10px;color:#888;max-width:140px;white-space:normal">'+t.prods
+          +' <span onclick="_compraDetailClick('+i+')" style="cursor:pointer;font-size:15px;color:#7c3aed" title="Ver projeção por tamanho (MT e KG)">&#9432;</span>'
+        +'</td>'
         +'</tr>';
     }).join('');
   }
@@ -1896,6 +1974,7 @@ function renderCompra(){
       +'<th rowspan="2" onclick="sortTbl(&#39;'+tblId+'&#39;,13)" style="color:#2563eb">-Estoque</th>'
       +'<th rowspan="2" onclick="sortTbl(&#39;'+tblId+'&#39;,14)" style="color:#b91c1c">COMPRAR MT</th>'
       +'<th rowspan="2" onclick="sortTbl(&#39;'+tblId+'&#39;,15)" style="color:#b91c1c">COMPRAR KG</th>'
+      +'<th rowspan="2" style="color:#b91c1c;background:#fff8f8">KG s/WIP</th>'
       +'<th rowspan="2" onclick="sortTbl(&#39;'+tblId+'&#39;,16)" style="color:#059669">Sobra</th>'
       +'<th rowspan="2" onclick="sortTbl(&#39;'+tblId+'&#39;,17)">Status</th>'
       +'<th rowspan="2" onclick="sortTbl(&#39;'+tblId+'&#39;,18)">Produtos</th></tr>'
@@ -1930,7 +2009,7 @@ function renderCompra(){
   }
 
   // Build XLSX data
-  var xlHdr=['Tecido','Cor','Un.','Jan/26','Fev/26','Mar/26','Abr Proj','Mai/26','Jun/26','Jul/26','Total 3M','WIP','Em Compra','Estoque','COMPRAR MT','COMPRAR KG','Sobra','Status','Produtos'];
+  var xlHdr=['Tecido','Cor','Un.','Jan/26','Fev/26','Mar/26','Abr Proj','Mai/26','Jun/26','Jul/26','Total 3M','WIP','Em Compra','Estoque','COMPRAR MT','COMPRAR KG','KG s/WIP','Sobra','Status','Produtos'];
   var xlDiversos=[xlHdr.slice()], xlJeans=[xlHdr.slice()];
   var totDiv=_calcTotals(tecsDiversos), totJns=_calcTotals(tecsJeans);
   var totAll={mai:totDiv.mai+totJns.mai,jun:totDiv.jun+totJns.jun,jul:totDiv.jul+totJns.jul,
@@ -2107,6 +2186,14 @@ function renderGastos(){
   var grandJun=cats.reduce(function(a,c){return a+totais.jun[c];},0);
   var grandJul=cats.reduce(function(a,c){return a+totais.jul[c];},0);
   var grandTotal=grandMai+grandJun+grandJul;
+  // Custo total de compra de tecido (3 meses)
+  var totalCompraKG=0, totalCompraKGsemWip=0;
+  var PRECO_MEDIO_KG=35; // R$/KG fallback
+  Object.values(fabricNeeds).forEach(function(t){
+    if(!t||t.und!=='KG') return;
+    totalCompraKG+=round1(t.liq||0);
+    totalCompraKGsemWip+=round1(t.liqSemWip||0);
+  });
   function fR(v){return 'R$ '+Math.round(v).toLocaleString('pt-BR');}
   function fR2(v){return 'R$ '+v.toFixed(2).replace('.',',');}
   // KPIs
@@ -2170,6 +2257,23 @@ function renderGastos(){
   var coverPct=totalPcs>0?(matchedPcs/totalPcs*100).toFixed(1):'0';
   var coverHtml=matchedPcs<totalPcs?'<div style="font-size:11px;color:#92400e;background:#fef3c7;border:1px solid #fde68a;border-radius:6px;padding:8px 14px;margin:12px 20px 0">&#9888; '+coverPct+'% das pecas tem custo referenciado ('+fmtN(matchedPcs)+' de '+fmtN(totalPcs)+'). Pecas sem referencia usam custo medio estimado.</div>':'';
 
+  // ── COMPRA TECIDO KG ──────────────────────────────────────────────────
+  var _totalCompraKG=0, _totalCompraKGsw=0, _totalCompraMT=0;
+  Object.values(fabricNeeds).forEach(function(t){
+    if(!t) return;
+    if(t.und==='KG'){_totalCompraKG+=t.liq||0; _totalCompraKGsw+=t.liqSemWip||0;}
+    else if(t.und==='MT'){_totalCompraMT+=t.liq||0;}
+  });
+  // Add fabric KPIs to existing kpiHtml
+  kpiHtml=kpiHtml.replace('</div>',
+    '<div class="kpi"><div class="kpi-label" style="font-size:10px">Comprar KG (c/WIP)</div>'
+    +'<div class="kpi-value" style="color:#b91c1c;font-size:22px">'+fmtD(_totalCompraKG,1)+'</div>'
+    +'<div class="kpi-sub">kg tecido</div></div>'
+    +'<div class="kpi"><div class="kpi-label" style="font-size:10px">Comprar KG (s/WIP)</div>'
+    +'<div class="kpi-value" style="color:#7f1d1d;font-size:22px">'+fmtD(_totalCompraKGsw,1)+'</div>'
+    +'<div class="kpi-sub">kg tecido sem wip</div></div>'
+    +'</div>');
+
   // ── PROJECAO DE FATURAMENTO ──
   var rp=_revParams;
   var pcsMai=totais.mai.pcs, pcsJun=totais.jun.pcs, pcsJul=totais.jul.pcs;
@@ -2212,19 +2316,23 @@ function renderGastos(){
     {label:'(-) Frete',mai:frtMai,jun:frtJun,jul:frtJul,color:'#888'},
     {label:'(-) ICMS '+rp.icms+'%',mai:icmMai,jun:icmJun,jul:icmJul,color:'#888'},
     {label:'(-) Despesa Oper. '+rp.desp+'%',mai:despMai,jun:despJun,jul:despJul,color:'#888'},
-    {label:'= Margem de Contribuicao',mai:mcMai,jun:mcJun,jul:mcJul,color:margClr(margTot)}
+    {label:'= Margem de Contribuicao',mai:mcMai,jun:mcJun,jul:mcJul,color:margClr(margTot)},
+    {label:'Compra Tecido KG (c/WIP)',mai:_totalCompraKG,jun:0,jul:0,color:'#b91c1c',_isKg:true},
+    {label:'Compra Tecido KG (s/WIP)',mai:_totalCompraKGsw,jun:0,jul:0,color:'#7f1d1d',_isKg:true}
   ];
   var revRows=revCats.map(function(r,i){
     var tot=r.mai+r.jun+r.jul;
     var isMC=i===revCats.length-1;
     var bold=isMC||i===0?'font-weight:700;':'';
     var bg=isMC?'background:#f0fdf4;border-top:2px solid var(--border2);':'';
+    var _fmt=r._isKg?function(v){return v>0?fmtD(v,1)+' KG':'—';}:fR;
+    var _tot=r._isKg?r.mai+r.jun+r.jul:tot;
     return '<tr style="'+bg+'">'
       +'<td style="'+bold+'color:'+r.color+'">'+r.label+'</td>'
-      +'<td class="num" style="'+bold+'color:'+r.color+'">'+fR(r.mai)+'</td>'
-      +'<td class="num" style="'+bold+'color:'+r.color+'">'+fR(r.jun)+'</td>'
-      +'<td class="num" style="'+bold+'color:'+r.color+'">'+fR(r.jul)+'</td>'
-      +'<td class="num" style="'+bold+'color:'+r.color+';font-size:13px">'+fR(tot)+'</td>'
+      +'<td class="num" style="'+bold+'color:'+r.color+'">'+_fmt(r.mai)+'</td>'
+      +'<td class="num" style="'+bold+'color:'+r.color+'">'+_fmt(r.jun)+'</td>'
+      +'<td class="num" style="'+bold+'color:'+r.color+'">'+_fmt(r.jul)+'</td>'
+      +'<td class="num" style="'+bold+'color:'+r.color+';font-size:13px">'+_fmt(_tot)+'</td>'
       +(isMC?'<td class="num" style="font-weight:700;color:'+r.color+'">'+((recMai+recJun+recJul)>0?(tot/(recMai+recJun+recJul)*100).toFixed(1).replace('.',',')+'%':'--')+'</td>':'<td></td>')
       +'</tr>';
   }).join('');
