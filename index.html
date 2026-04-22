@@ -2391,15 +2391,26 @@ function renderProduto(){
   var qtdTotal=rankMC.reduce(function(s,x){return s+x.total;},0);
   var custoTotal=rankMC.reduce(function(s,x){return s+(x.total*x.custo);},0);
 
-  // === Distribuicao por Tecido ===
+  // === Distribuicao por Tecido (base: projData, chave normalizada) ===
   var byTec={};
-  rankMC.forEach(function(mc){
-    var tec=mc.tecido||'--';
-    if(!byTec[tec]) byTec[tec]=0;
-    byTec[tec]+=mc.total;
+  ['2026-05','2026-06','2026-07'].forEach(function(mes){
+    (projData[mes]||[]).forEach(function(r){
+      var tecRaw=(r.tecido||'').toString().trim();
+      if(!tecRaw||tecRaw==='N/M') return;
+      // Normaliza: uppercase + colapsa espacos; aliases comuns
+      var key=tecRaw.toUpperCase().replace(/\s+/g,' ').trim();
+      if(/^VIVA LIGHT/.test(key)||/^VITTA LIGHT/.test(key)) key='VITTA LIGHT';
+      if(/^TULE MYRA/.test(key)) key='TULE MYRA';
+      if(/^CANELADO TULUM/.test(key)||/^TULUM CANELADO/.test(key)) key='TULUM CANELADO';
+      if(/^VISCO SLIM/.test(key)) key='VISCO SLIM';
+      if(/^NATURAL RUF/.test(key)) key='NATURAL RUFFLE';
+      if(/^ECLIPSE/.test(key)) key='ECLIPSE BLUE BLACK';
+      if(!byTec[key]) byTec[key]={qty:0, display:tecRaw};
+      byTec[key].qty+=(r.qty||0);
+    });
   });
-  var tecList=Object.keys(byTec).map(function(t){
-    return {tecido:t, qty:byTec[t], pct:qtdTotal>0?(byTec[t]/qtdTotal*100):0};
+  var tecList=Object.keys(byTec).map(function(k){
+    return {tecido:k, qty:byTec[k].qty, pct:qtdTotal>0?(byTec[k].qty/qtdTotal*100):0};
   }).sort(function(a,b){return b.qty-a.qty;});
 
   // === KPIs ===
