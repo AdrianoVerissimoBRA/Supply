@@ -2320,6 +2320,13 @@ function renderProduto(){
   var host=document.getElementById('tab-produto');
   if(!host) return;
 
+  // === Normalizador de modelo (CELENA → SELENA) ===
+  function _normMod(m){
+    var u=(m||'').toUpperCase().trim();
+    if(u==='CELENA') return 'SELENA';
+    return u;
+  }
+
   // === Agregador por MODELO+COR (base: projData Mai+Jun+Jul) ===
   var byMC={};
   var byMod={};
@@ -2328,7 +2335,7 @@ function renderProduto(){
   ['2026-05','2026-06','2026-07'].forEach(function(mes){
     (projData[mes]||[]).forEach(function(r){
       if(!r.modelo) return;
-      var mod=(r.modelo||'').toUpperCase().trim();
+      var mod=_normMod(r.modelo);
       var cor=(r.cor||'').toUpperCase().trim();
       var tam=(r.tamanho||'').toUpperCase().trim();
       var mcKey=mod+'||'+cor;
@@ -2355,7 +2362,10 @@ function renderProduto(){
 
   // Enriquece com PRODUCT_INFO
   Object.values(byMC).forEach(function(mc){
-    var pi=PRODUCT_INFO[mc.modelo+'||'+mc.cor]||{};
+    var pi=PRODUCT_INFO[mc.modelo+'||'+mc.cor]
+          ||PRODUCT_INFO['CELENA||'+mc.cor]
+          ||PRODUCT_INFO['SELENA||'+mc.cor]
+          ||{};
     mc.tipo=pi.tipo||'';
     mc.tecido=pi.tecido||'';
     mc.consumo=pi.consumo||0;
@@ -2381,6 +2391,17 @@ function renderProduto(){
   var qtdTotal=rankMC.reduce(function(s,x){return s+x.total;},0);
   var custoTotal=rankMC.reduce(function(s,x){return s+(x.total*x.custo);},0);
 
+  // === Distribuicao por Tecido ===
+  var byTec={};
+  rankMC.forEach(function(mc){
+    var tec=mc.tecido||'--';
+    if(!byTec[tec]) byTec[tec]=0;
+    byTec[tec]+=mc.total;
+  });
+  var tecList=Object.keys(byTec).map(function(t){
+    return {tecido:t, qty:byTec[t], pct:qtdTotal>0?(byTec[t]/qtdTotal*100):0};
+  }).sort(function(a,b){return b.qty-a.qty;});
+
   // === KPIs ===
   var kpiHtml='<div class="kpi-strip">'
     +'<div class="kpi"><div class="kpi-label">Produtos</div><div class="kpi-value">'+nProdutos+'</div></div>'
@@ -2391,6 +2412,37 @@ function renderProduto(){
     +'<div class="kpi"><div class="kpi-label">Quantidade Projetada (3M)</div><div class="kpi-value">'+fmtN(qtdTotal)+'</div></div>'
     +'<div class="kpi"><div class="kpi-label">Custo Produção Total</div><div class="kpi-value">R$ '+fmtN(custoTotal)+'</div></div>'
     +'</div>';
+
+  // === Tecido breakdown (barra horizontal + lista) ===
+  var tecPalette=['#7c3aed','#2563eb','#059669','#dc2626','#ea580c','#ca8a04','#db2777','#0891b2','#6b21a8','#16a34a','#c2410c','#4338ca','#b91c1c','#0f766e','#9333ea','#0369a1'];
+  var barHtml='<div style="display:flex;height:28px;border-radius:6px;overflow:hidden;border:1px solid #e5e7eb;margin-bottom:12px">';
+  var legendHtml='<div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px">';
+  tecList.forEach(function(t,i){
+    var col=tecPalette[i%tecPalette.length];
+    var w=t.pct;
+    if(w>=1.5){
+      barHtml+='<div title="'+t.tecido+': '+t.pct.toFixed(1).replace(".",",")+'% ('+fmtN(t.qty)+' pç)" style="background:'+col+';width:'+w+'%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:600;overflow:hidden;white-space:nowrap">'+(w>=6?t.pct.toFixed(0)+'%':'')+'</div>';
+    } else if(w>0) {
+      barHtml+='<div title="'+t.tecido+': '+t.pct.toFixed(1).replace(".",",")+'%" style="background:'+col+';width:'+w+'%"></div>';
+    }
+    legendHtml+='<div style="display:flex;align-items:center;gap:5px;background:#fafafa;padding:4px 10px;border-radius:14px;border:1px solid #eee">'
+      +'<span style="width:10px;height:10px;background:'+col+';border-radius:50%;display:inline-block"></span>'
+      +'<span style="font-weight:600">'+t.tecido+'</span>'
+      +'<span style="color:#666">'+t.pct.toFixed(1).replace(".",",")+'%</span>'
+      +'<span style="color:#999;font-size:11px">('+fmtN(t.qty)+' pç)</span>'
+    +'</div>';
+  });
+  barHtml+='</div>';
+  legendHtml+='</div>';
+  var tecBreakdownHtml='<div style="padding:0 20px 5px"><div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px 20px">'
+    +'<div style="font-size:13px;font-weight:700;color:#374151;margin-bottom:10px;display:flex;align-items:center;gap:8px">'
+    +'<span style="width:4px;height:16px;background:#7c3aed;border-radius:2px"></span>'
+    +'&#129525; Distribuição da Produção por Tecido'
+    +'<span style="font-size:11px;font-weight:400;color:#888;margin-left:auto">'+tecList.length+' tecidos · '+fmtN(qtdTotal)+' peças projetadas</span>'
+    +'</div>'
+    +barHtml
+    +legendHtml
+  +'</div></div>';
 
   // === Ranking table (Produto+Cor) ===
   var xlData=[['#','Modelo','Cor','Tipo','Mai','Jun','Jul','Total 3M','% do Total','SKUs','Tamanhos','Tecido','Consumo','Forro','Consumo Forro','Tec. Substituto','Custo Produção','Fornecedor','Fornecedor Forro']];
@@ -2447,7 +2499,7 @@ function renderProduto(){
 
   var thStyle='background:#faf5ff;color:#6b21a8;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px;padding:10px 8px;border-bottom:2px solid #e9d5ff;position:sticky;top:0';
 
-  host.innerHTML = kpiHtml
+  host.innerHTML = kpiHtml + tecBreakdownHtml
     +'<div style="padding:20px">'
       +'<div class="section-title" style="margin-bottom:15px"><span class="section-bar" style="background:#1e40af"></span>&#127942; Ranking por Produto (consolidado)'
         +'<button onclick="dlKey(\'info_produto_modelo\',\'Info_Produto_Ranking_Modelo.xlsx\')" style="'+btnStyle+'">XLSX</button>'
